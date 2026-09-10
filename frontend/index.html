@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>BBHT</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0b0f14" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/assets/icon.svg" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>🛡️ BBHT</h1>
+    <p>Bug Bounty Hunting Toolkit — OWASP Top 10 scanner</p>
+  </header>
+
+  <main>
+    <div class="banner">
+      ⚠️ Only scan targets you are explicitly authorized to test (your own systems, or in-scope
+      assets of a bug bounty program you're enrolled in). Unauthorized scanning may be illegal.
+    </div>
+
+    <!-- TARGETS VIEW -->
+    <section id="view-targets" class="view active">
+      <div class="card">
+        <h3>Add target</h3>
+        <label>Name</label>
+        <input type="text" id="t-name" placeholder="Acme Corp - Main Program" />
+        <label>Domain (used for subdomain recon)</label>
+        <input type="text" id="t-domain" placeholder="example.com" />
+        <label>Program URL (optional)</label>
+        <input type="url" id="t-program" placeholder="https://hackerone.com/acme" />
+        <label>Notes</label>
+        <textarea id="t-notes" placeholder="Scope, exclusions, reward tiers..."></textarea>
+        <div class="checkrow">
+          <input type="checkbox" id="t-authorized" />
+          <label for="t-authorized" style="margin:0;">
+            I confirm I am authorized to test this target (owner, or in-scope under a bug bounty
+            program's published policy).
+          </label>
+        </div>
+        <button class="btn" id="btn-add-target">Add target</button>
+      </div>
+
+      <div id="targets-list"></div>
+    </section>
+
+    <!-- SCAN VIEW -->
+    <section id="view-scan" class="view">
+      <div class="card">
+        <h3>New scan</h3>
+        <label>Target</label>
+        <select id="s-target"></select>
+        <label>URL to test (include query params for injection tests)</label>
+        <input type="url" id="s-url" placeholder="https://example.com/search?q=test" />
+        <label>Modules</label>
+        <div class="module-grid" id="s-modules"></div>
+        <button class="btn" id="btn-start-scan">Run scan</button>
+      </div>
+
+      <div class="card">
+        <h3>Recent scans</h3>
+        <div id="scans-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Manual-review checklist</h3>
+        <p style="font-size:12px;color:var(--muted);margin-top:-4px;">
+          These OWASP categories can't be reliably black-box automated — review them yourself.
+        </p>
+        <div id="manual-checklist"></div>
+      </div>
+    </section>
+
+    <!-- FINDINGS VIEW -->
+    <section id="view-findings" class="view">
+      <div class="card">
+        <h3>Findings</h3>
+        <label>Scan</label>
+        <select id="f-scan"></select>
+      </div>
+      <div id="findings-list"></div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button data-view="targets" class="active"><span class="ic">🎯</span>Targets</button>
+    <button data-view="scan"><span class="ic">🔍</span>Scan</button>
+    <button data-view="findings"><span class="ic">📋</span>Findings</button>
+  </nav>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
