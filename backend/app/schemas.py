@@ -36,6 +36,11 @@ class ScanCreate(BaseModel):
     modules: list[str]
 
 
+class DiscoverRequest(BaseModel):
+    target_id: int
+    base_url: str
+
+
 class FindingOut(BaseModel):
     id: int
     category: str

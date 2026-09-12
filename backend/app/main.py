@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import init_db, get_db, SessionLocal
 from .models import Target, Scan, Finding
-from .schemas import TargetCreate, TargetOut, ScanCreate, ScanOut, FindingOut
+from .schemas import TargetCreate, TargetOut, ScanCreate, ScanOut, FindingOut, DiscoverRequest
 from .scanners import MODULE_REGISTRY
+from .scanners.crawler import discover as crawl_discover
 
 MANUAL_ONLY_CATEGORIES = [
     {
@@ -186,6 +187,25 @@ async def get_findings(scan_id: int, db: AsyncSession = Depends(get_db)):
 @app.get("/api/modules")
 async def list_modules():
     return sorted(MODULE_REGISTRY.keys())
+
+
+@app.post("/api/discover")
+async def discover_endpoint(payload: DiscoverRequest, db: AsyncSession = Depends(get_db)):
+    target = await db.get(Target, payload.target_id)
+    if not target:
+        raise HTTPException(404, "Target not found")
+    if not target.authorized:
+        raise HTTPException(403, "Target is not marked as authorized for testing")
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": "BBHT-Scanner/1.0 (authorized-testing)"},
+        verify=True,
+    ) as client:
+        try:
+            result = await asyncio.wait_for(crawl_discover(payload.base_url, client), timeout=60)
+        except asyncio.TimeoutError:
+            raise HTTPException(504, "Crawl timed out")
+    return result
 
 
 # --- Static frontend (mobile-first PWA) ---

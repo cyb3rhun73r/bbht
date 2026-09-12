@@ -118,6 +118,43 @@ async function loadModules() {
   `).join("");
 }
 
+$("#btn-discover").addEventListener("click", async () => {
+  const targetId = parseInt($("#s-target").value, 10);
+  const baseUrl = $("#s-url").value.trim() || (state.targets.find((t) => t.id === targetId) || {}).domain;
+  if (!targetId) return alert("Add and select a target first.");
+  if (!baseUrl) return alert("Enter a URL or pick a target with a domain first.");
+  const url = baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`;
+
+  const statusEl = $("#discover-status");
+  const resultsEl = $("#discover-results");
+  statusEl.textContent = "Crawling site for parameterized URLs… this can take up to a minute.";
+  resultsEl.innerHTML = "";
+  $("#btn-discover").disabled = true;
+  try {
+    const result = await api("/discover", {
+      method: "POST",
+      body: JSON.stringify({ target_id: targetId, base_url: url }),
+    });
+    statusEl.textContent = `Crawled ${result.pages_crawled} page(s), found ${result.parameterized_urls.length} URL(s) with parameters.`;
+    if (!result.parameterized_urls.length) {
+      resultsEl.innerHTML = '<div class="empty">No parameterized URLs found. The site may be a single-page app, or you can enter a URL manually.</div>';
+    } else {
+      resultsEl.innerHTML = result.parameterized_urls.map((u) => `
+        <div class="discover-item" onclick="pickDiscovered('${u.replace(/'/g, "\\'")}')">${esc(u)}</div>
+      `).join("");
+    }
+  } catch (e) {
+    statusEl.textContent = "Error: " + e.message;
+  } finally {
+    $("#btn-discover").disabled = false;
+  }
+});
+
+window.pickDiscovered = function (url) {
+  $("#s-url").value = url;
+  window.scrollTo({ top: $("#s-url").getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
+};
+
 $("#btn-start-scan").addEventListener("click", async () => {
   const targetId = parseInt($("#s-target").value, 10);
   const url = $("#s-url").value.trim();

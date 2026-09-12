@@ -56,6 +56,9 @@
         <select id="s-target"></select>
         <label>URL to test (include query params for injection tests)</label>
         <input type="url" id="s-url" placeholder="https://example.com/search?q=test" />
+        <button class="btn secondary" id="btn-discover" type="button">🔎 Discover URLs with parameters</button>
+        <div id="discover-status" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+        <div id="discover-results"></div>
         <label>Modules</label>
         <div class="module-grid" id="s-modules"></div>
         <button class="btn" id="btn-start-scan">Run scan</button>
