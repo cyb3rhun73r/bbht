@@ -41,6 +41,7 @@ function switchView(name) {
   $("#view-" + name).classList.add("active");
   document.querySelector(`.tabbar button[data-view="${name}"]`).classList.add("active");
   if (name === "scan") refreshScans();
+  if (name === "apk") refreshApkScans();
   if (name === "findings") refreshFindingsScanOptions();
 }
 
@@ -73,8 +74,9 @@ function renderTargets() {
 }
 
 function renderTargetSelect() {
-  const sel = $("#s-target");
-  sel.innerHTML = state.targets.map((t) => `<option value="${t.id}">${esc(t.name)} (${esc(t.domain)})</option>`).join("");
+  const opts = state.targets.map((t) => `<option value="${t.id}">${esc(t.name)} (${esc(t.domain)})</option>`).join("");
+  $("#s-target").innerHTML = opts;
+  $("#apk-target").innerHTML = opts;
 }
 
 window.deleteTarget = async function (id) {
@@ -172,6 +174,66 @@ $("#btn-start-scan").addEventListener("click", async () => {
     alert("Error: " + e.message);
   }
 });
+
+// --- APK scans ---
+$("#btn-scan-apk").addEventListener("click", async () => {
+  const targetId = parseInt($("#apk-target").value, 10);
+  const fileInput = $("#apk-file");
+  const file = fileInput.files[0];
+  if (!targetId) return alert("Add and select a target first.");
+  if (!file) return alert("Choose an .apk file first.");
+
+  const btn = $("#btn-scan-apk");
+  btn.disabled = true;
+  btn.textContent = "Uploading & analyzing…";
+  try {
+    const form = new FormData();
+    form.append("target_id", targetId);
+    form.append("file", file);
+    const r = await fetch(API + "/apk-scans", { method: "POST", body: form });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((data && data.detail) || r.statusText);
+    fileInput.value = "";
+    await refreshApkScans();
+  } catch (e) {
+    alert("Error: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyze APK";
+  }
+});
+
+let apkScans = [];
+let apkPollTimer = null;
+
+async function refreshApkScans() {
+  const all = await api("/scans");
+  apkScans = all.filter((s) => s.modules === "apk_analysis");
+  renderApkScans();
+  const hasRunning = apkScans.some((s) => s.status === "running" || s.status === "queued");
+  clearTimeout(apkPollTimer);
+  if (hasRunning) apkPollTimer = setTimeout(refreshApkScans, 3000);
+}
+
+function renderApkScans() {
+  const el = $("#apk-scans-list");
+  if (!apkScans.length) {
+    el.innerHTML = '<div class="empty">No APK scans yet.</div>';
+    return;
+  }
+  el.innerHTML = apkScans.slice(0, 15).map((s) => `
+    <div class="target-item">
+      <div class="row">
+        <div style="font-size:13px;word-break:break-all;max-width:70%;">${esc(s.url)}</div>
+        <span class="status-pill ${s.status}">${s.status === "running" ? '<span class="spinner"></span>' : ""}${esc(s.status)}</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${esc(s.progress || "")}</div>
+      <div style="margin-top:8px;">
+        <button class="btn small" onclick="viewFindings(${s.id})">View findings</button>
+      </div>
+    </div>
+  `).join("");
+}
 
 async function refreshScans() {
   state.scans = await api("/scans");

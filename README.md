@@ -68,6 +68,25 @@ All active checks use safe, non-destructive payloads (no data exfiltration,
 no destructive SQL, no real SSRF callbacks) — good enough to prove a finding
 for a bug bounty report, not to actually exploit it further.
 
+### Android APK static analysis
+
+The **APK** tab lets you upload an `.apk` file for static analysis (no code
+execution, no dynamic instrumentation) covering common Mobile OWASP Top 10
+issues:
+
+- Manifest checks: `android:debuggable`, `android:allowBackup`,
+  cleartext-traffic settings
+- Exported activities/services/receivers/providers with no permission
+  protection (Intent-based attack surface)
+- Dangerous permission requests (SMS, background location, accessibility
+  service, install-packages, etc.)
+- Hardcoded secrets scanned across the whole archive (AWS/Google API keys,
+  Stripe keys, Slack tokens, private key material, generic API key/secret
+  assignments)
+
+Requires the same target-authorization checkbox as the web scanner — only
+analyze APKs you own or that are in-scope for a program you're enrolled in.
+
 ## Running it (Docker)
 
 ```bash

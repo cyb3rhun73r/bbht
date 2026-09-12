@@ -1,9 +1,11 @@
 import asyncio
 import datetime
 import os
+import tempfile
+import uuid
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,9 @@ from .models import Target, Scan, Finding
 from .schemas import TargetCreate, TargetOut, ScanCreate, ScanOut, FindingOut, DiscoverRequest
 from .scanners import MODULE_REGISTRY
 from .scanners.crawler import discover as crawl_discover
+from .scanners.apk_analysis import analyze as analyze_apk
+
+MAX_APK_BYTES = 300 * 1024 * 1024  # 300MB
 
 MANUAL_ONLY_CATEGORIES = [
     {
@@ -156,6 +161,102 @@ async def create_scan(payload: ScanCreate, background_tasks: BackgroundTasks, db
     await db.refresh(scan)
 
     background_tasks.add_task(_execute_scan, scan.id, payload.modules)
+    return scan
+
+
+async def _execute_apk_scan(scan_id: int, apk_path: str):
+    async with SessionLocal() as db:
+        scan = await db.get(Scan, scan_id)
+        scan.status = "running"
+        scan.progress = "analyzing APK"
+        await db.commit()
+
+        findings_buffer: list[dict] = []
+
+        def emit(finding: dict):
+            findings_buffer.append(finding)
+
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(analyze_apk, apk_path, emit), timeout=180
+            )
+        except asyncio.TimeoutError:
+            emit({
+                "category": "Scanner",
+                "title": "APK analysis timed out",
+                "severity": "info",
+                "confidence": "info",
+                "location": scan.url,
+                "evidence": "Analysis exceeded time budget and was aborted.",
+                "poc": "",
+                "remediation": "",
+            })
+        except Exception as e:
+            emit({
+                "category": "Scanner",
+                "title": "APK analysis errored",
+                "severity": "info",
+                "confidence": "info",
+                "location": scan.url,
+                "evidence": str(e)[:300],
+                "poc": "",
+                "remediation": "",
+            })
+        finally:
+            try:
+                os.remove(apk_path)
+            except OSError:
+                pass
+
+        for f in findings_buffer:
+            db.add(Finding(scan_id=scan.id, **f))
+
+        scan.status = "completed"
+        scan.progress = "done"
+        scan.finished_at = datetime.datetime.utcnow()
+        await db.commit()
+
+
+@app.post("/api/apk-scans", response_model=ScanOut)
+async def create_apk_scan(
+    background_tasks: BackgroundTasks,
+    target_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    target = await db.get(Target, target_id)
+    if not target:
+        raise HTTPException(404, "Target not found")
+    if not target.authorized:
+        raise HTTPException(403, "Target is not marked as authorized for testing")
+    if not file.filename.lower().endswith(".apk"):
+        raise HTTPException(400, "File must be a .apk")
+
+    upload_dir = os.path.join(tempfile.gettempdir(), "bbht-apk-uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    dest_path = os.path.join(upload_dir, f"{uuid.uuid4().hex}.apk")
+
+    size = 0
+    with open(dest_path, "wb") as out:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > MAX_APK_BYTES:
+                out.close()
+                os.remove(dest_path)
+                raise HTTPException(413, "APK exceeds max upload size (300MB)")
+            out.write(chunk)
+
+    scan = Scan(
+        target_id=target.id,
+        url=file.filename,
+        modules="apk_analysis",
+        status="queued",
+    )
+    db.add(scan)
+    await db.commit()
+    await db.refresh(scan)
+
+    background_tasks.add_task(_execute_apk_scan, scan.id, dest_path)
     return scan
 
 
