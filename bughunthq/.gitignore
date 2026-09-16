@@ -4,3 +4,8 @@ __pycache__/
 build/
 dist/
 *.spec
+
+# tools/ is populated by tools/fetch_tools.py (binaries + vendored repos) -
+# never commit fetched/vendored third-party tools to this repo.
+tools/*
+!tools/fetch_tools.py

@@ -9,17 +9,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/3] Creating virtual environment (.venv)...
+echo [1/4] Creating virtual environment (.venv)...
 python -m venv .venv
 call .venv\Scripts\activate.bat
 
-echo [2/3] Installing dependencies...
+echo [2/4] Installing dependencies...
 pip install --upgrade pip >nul
 pip install -r requirements.txt
 
-echo [3/3] Building BugHuntHQ.exe with PyInstaller...
+echo [3/4] Fetching/vendoring attack tools into tools\ ...
+python tools\fetch_tools.py
+
+echo [4/4] Building BugHuntHQ.exe with PyInstaller...
 pyinstaller --onefile --windowed --name BugHuntHQ bughunthq.py
 
+echo [*] Bundling tools\ next to the built exe...
+if not exist dist\tools mkdir dist\tools
+xcopy /E /I /Y tools dist\tools >nul
+
 echo.
-echo Done. Your exe is at dist\BugHuntHQ.exe
+echo Done. Your app is dist\BugHuntHQ.exe with its dist\tools\ folder beside it.
+echo Copy the whole dist\ folder together - the exe looks for tools\ next to itself.
 pause

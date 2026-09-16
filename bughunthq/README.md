@@ -4,7 +4,7 @@ A Windows desktop app (Python + Tkinter, packaged as a single `.exe` with
 PyInstaller) that automates the recon → triage step of bug hunting:
 
 - Passive + light-active subdomain enumeration (crt.sh, plus `subfinder`/`amass`
-  if you already have them on PATH) and liveness/tech-fingerprint checks.
+  when bundled or on PATH) and liveness/tech-fingerprint checks.
 - Crawls live hosts, mines JS bundles for hidden endpoints, and flags possible
   hardcoded secrets.
 - Discovers URL parameters and runs safe, single-request checks for reflected
@@ -13,10 +13,15 @@ PyInstaller) that automates the recon → triage step of bug hunting:
   GraphQL endpoints, WordPress user enumeration, missing security headers.
 - **Smart suggestions:** turns every recon signal into a ranked (P1–P5) attack
   hypothesis with a ready-to-copy command for the matching tool (sqlmap,
-  dalfox, ffuf, wpscan, git-dumper, GraphQL introspection, etc). Commands are
-  never run automatically — you review, then Copy or Run them yourself, and
-  Run only works if the tool is already installed and you've checked the
-  authorization box.
+  dalfox, ffuf, nuclei, wpscan, git-dumper, GraphQL introspection, etc).
+  Commands are never run automatically — you review, then Copy or Run them
+  yourself, and Run only works once you've checked the authorization box.
+- **Tools are bound into the app**, not something you install separately:
+  `tools\fetch_tools.py` downloads the official Windows binaries for nuclei,
+  subfinder, ffuf and dalfox and vendors sqlmap + git-dumper as source, all
+  into a `tools\` folder that ships next to `BugHuntHQ.exe` and that the app
+  checks automatically before falling back to PATH. `build.bat` runs this
+  for you.
 - A findings log with severity/status tracking and one-click Markdown export.
 - Projects save/load as plain `.json` files on your machine — nothing is sent
   anywhere except the domain you scan and crt.sh for passive lookups.
@@ -44,31 +49,38 @@ a Windows machine* (it can't be cross-compiled from Linux/macOS):
 1. Install Python 3.10+ from python.org, checking "Add python.exe to PATH".
 2. Copy this `bughunthq` folder onto your Windows 11 machine.
 3. Open Command Prompt in that folder and run `build.bat`.
-4. Your app is at `dist\BugHuntHQ.exe` — copy it anywhere and double-click to run.
+   - This also runs `tools\fetch_tools.py`, which downloads/vendors the
+     attack tools below into `tools\` and copies that folder next to the exe.
+4. Your app is the whole `dist\` folder — `BugHuntHQ.exe` plus `dist\tools\`
+   beside it. Copy/zip/share the folder as a unit; double-click the exe to run.
 
-No Python installation is needed on machines that only *run* the built exe.
+No Python installation is needed on machines that only *run* the built app —
+the exe carries its own interpreter, including for the vendored Python tools.
 
-## Optional external tools
+## Bound attack tools
 
-Bug Hunt HQ shells out to these tools **only when you click Run**, and only
-if they're already on your PATH. Install whichever you want the "Run" button
-to work for; everything else still shows a copyable command:
+`tools\fetch_tools.py` (run automatically by `build.bat`, or run it yourself
+any time to update) fetches these straight into `tools\`, and the app checks
+that folder before PATH, so "Run" on a suggestion works out of the box:
 
-| Tool | Used for | Project |
-|---|---|---|
-| subfinder | extra passive subdomain sources | https://github.com/projectdiscovery/subfinder |
-| amass | extra passive subdomain sources | https://github.com/owasp-amass/amass |
-| sqlmap | SQL injection confirmation | https://github.com/sqlmapproject/sqlmap |
-| dalfox | reflected/DOM XSS confirmation | https://github.com/hahwul/dalfox |
-| ffuf | fuzzing (LFI params, directories) | https://github.com/ffuf/ffuf |
-| nuclei | template-based vuln scanning | https://github.com/projectdiscovery/nuclei |
-| wpscan | WordPress-specific scanning | https://github.com/wpscanteam/wpscan |
-| git-dumper | dumping an exposed `.git` directory | https://github.com/arthaud/git-dumper |
+| Tool | Used for | How it's bundled | Project |
+|---|---|---|---|
+| subfinder | extra passive subdomain sources | official Windows binary | https://github.com/projectdiscovery/subfinder |
+| nuclei | template-based vuln scanning | official Windows binary | https://github.com/projectdiscovery/nuclei |
+| ffuf | fuzzing (LFI params, directories) | official Windows binary | https://github.com/ffuf/ffuf |
+| dalfox | reflected/DOM XSS confirmation | official Windows binary | https://github.com/hahwul/dalfox |
+| sqlmap | SQL injection confirmation | vendored source, run via the exe's own interpreter | https://github.com/sqlmapproject/sqlmap |
+| git-dumper | dumping an exposed `.git` directory | vendored source, run via the exe's own interpreter | https://github.com/arthaud/git-dumper |
 
-On Windows, most Go-based tools (subfinder, nuclei, ffuf) install with
-`go install <module>@latest` once Go is installed; sqlmap and wpscan are a
-`pip install` / `gem install` away; see each project's own README for
-current install instructions.
+**wpscan** is not bundled — it needs a Ruby runtime, a poor fit for a
+single-folder bundle. Install it separately (`gem install wpscan`, or see
+https://github.com/wpscanteam/wpscan) if you want that suggestion runnable;
+otherwise Copy still gives you the command to run in your own terminal.
+**amass** is likewise left to PATH if you prefer it over the bundled
+subfinder — same reasoning, optional extra.
+
+Re-running `fetch_tools.py` skips anything already vendored and re-downloads
+the latest release binaries, so it's safe to use as an "update tools" step.
 
 ## How the suggestion engine decides
 

@@ -78,6 +78,47 @@ TOOL_HINTS = {
                            "-d \"{{\\\"query\\\":\\\"{{__schema{{types{{name}}}}}}\\\"}}\"",
 }
 
+# Pure-Python tools vendored as source (no separate runtime needed) rather
+# than a compiled binary. Path is relative to the bundled tools/ directory.
+PY_SCRIPT_TOOLS = {
+    "sqlmap": os.path.join("sqlmap", "sqlmap.py"),
+    "git-dumper": os.path.join("git-dumper", "git_dumper.py"),
+}
+
+
+def bundled_tools_dir():
+    """Where fetch_tools.py vendors tools, and where the running app looks for them."""
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "tools")
+
+
+def find_tool_path(tool_name):
+    """Look for a bundled compiled binary first, then fall back to PATH."""
+    exe_name = tool_name + (".exe" if os.name == "nt" else "")
+    candidate = os.path.join(bundled_tools_dir(), exe_name)
+    if os.path.isfile(candidate):
+        return candidate
+    return shutil.which(tool_name)
+
+
+def resolve_tool_argv(tool_name, rest_args):
+    """Build a runnable argv for a suggested tool: bundled binary > bundled
+    Python script (run in-process via this app's own interpreter, even when
+    frozen into an exe) > whatever's on PATH. Returns None if nothing works."""
+    path = find_tool_path(tool_name)
+    if path:
+        return [path] + rest_args
+    if tool_name in PY_SCRIPT_TOOLS:
+        script_path = os.path.join(bundled_tools_dir(), PY_SCRIPT_TOOLS[tool_name])
+        if os.path.isfile(script_path):
+            if getattr(sys, "frozen", False):
+                return [sys.executable, "--bhq-pyscript", script_path] + rest_args
+            return [sys.executable, script_path] + rest_args
+    return None
+
 
 def marker():
     return "bhq" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
@@ -145,12 +186,12 @@ class Recon:
         except Exception as e:
             self.log("[!] crt.sh lookup error: {}".format(e))
 
-        # optional: use subfinder/amass if the user has them installed
+        # optional: use subfinder/amass, bundled in tools\ or found on PATH
         for tool in ("subfinder", "amass"):
-            path = shutil.which(tool)
+            path = find_tool_path(tool)
             if not path:
                 continue
-            self.log("[*] Found {} on PATH, running it too...".format(tool))
+            self.log("[*] Found {}, running it too...".format(tool))
             try:
                 if tool == "subfinder":
                     cmd = [path, "-d", self.domain, "-silent"]
@@ -433,6 +474,13 @@ class Recon:
         for sec in self.possible_secrets:
             s.append(self._sug(sec["kind"], "P1", sec["source"], "manual review",
                                 "Rotate/revoke immediately if confirmed live: {}".format(sec["snippet"])))
+
+        for host_rec in self.subdomains:
+            if host_rec["host"] in (self.domain, "www." + self.domain) and \
+                    host_rec["status"] and host_rec["status"] < 400:
+                s.append(self._sug("Run a nuclei template scan", "P4", host_rec["url"], "nuclei",
+                                    TOOL_HINTS["nuclei"].format(url=host_rec["url"],
+                                                                 tags="cve,exposure,misconfig")))
 
         sev_order = {"P1": 0, "P2": 1, "P3": 2, "P4": 3, "P5": 4}
         s.sort(key=lambda x: sev_order.get(x["severity"], 5))
@@ -742,16 +790,20 @@ class App:
         except ValueError as e:
             messagebox.showerror(APP_NAME, "Could not parse command: {}".format(e))
             return
-        tool = parts[0]
-        if not shutil.which(tool):
-            messagebox.showinfo(APP_NAME, "'{}' was not found on PATH. Install it first, then use "
-                                           "Copy to run it yourself, or re-try Run once it's installed.".format(tool))
+        tool, rest = parts[0], parts[1:]
+        argv = resolve_tool_argv(tool, rest)
+        if argv is None:
+            messagebox.showinfo(APP_NAME, "'{}' isn't bundled in tools\\ and wasn't found on PATH.\n\n"
+                                           "Run tools\\fetch_tools.py once (or re-run build.bat) to "
+                                           "download/vendor it, or install it yourself, then Run again.\n\n"
+                                           "You can always use Copy to run the command in your own "
+                                           "terminal instead.".format(tool))
             return
-        self.log("[*] Running: {}".format(cmd))
+        self.log("[*] Running: {}".format(" ".join(argv)))
 
         def worker():
             try:
-                proc = subprocess.run(parts, capture_output=True, text=True, timeout=600)
+                proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
                 self.log(proc.stdout[-4000:])
                 if proc.stderr:
                     self.log("[stderr] " + proc.stderr[-2000:])
@@ -870,6 +922,18 @@ class App:
 
 
 def main():
+    # Dispatch mode: when frozen into an exe, this re-invokes the exe itself
+    # to run a vendored pure-Python tool (sqlmap, git-dumper) in-process,
+    # using the interpreter PyInstaller already bundled - no separate Python
+    # install needed on the machine running the built .exe.
+    if len(sys.argv) >= 3 and sys.argv[1] == "--bhq-pyscript":
+        import runpy
+        script = sys.argv[2]
+        sys.argv = [script] + sys.argv[3:]
+        sys.path.insert(0, os.path.dirname(script))
+        runpy.run_path(script, run_name="__main__")
+        return
+
     root = tk.Tk()
     try:
         style = ttk.Style()
