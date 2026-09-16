@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 scan_result.json
 report.md
+
+# Engagement-specific scope/results are local artifacts, not part of the tool
+*_scope.json
+*_scan_result.json
+*_report.md
+!example_scope.json
