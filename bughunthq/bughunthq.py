@@ -54,8 +54,24 @@ REDIRECT_PARAM_HINTS = {"redirect", "redirect_uri", "redirect_url", "url", "next
                          "destination", "goto", "target"}
 SSRF_PARAM_HINTS = {"url", "uri", "link", "src", "source", "callback", "webhook",
                      "feed", "image", "fetch", "proxy", "path"}
+CMDI_PARAM_HINTS = {"cmd", "exec", "command", "run", "ping", "host", "ip", "shell"}
 UPLOAD_PATH_HINTS = {"upload", "file", "media", "attachment", "import"}
 ADMIN_PATH_HINTS = {"admin", "manage", "dashboard", "internal", "cpanel", "wp-admin"}
+JWT_RE = re.compile(r"\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
+
+# OWASP Top 10 (2021) category labels, used to tag every suggestion.
+OWASP = {
+    "A01": "A01 Broken Access Control",
+    "A02": "A02 Cryptographic Failures",
+    "A03": "A03 Injection",
+    "A04": "A04 Insecure Design",
+    "A05": "A05 Security Misconfiguration",
+    "A06": "A06 Vulnerable & Outdated Components",
+    "A07": "A07 Identification & Authentication Failures",
+    "A08": "A08 Software & Data Integrity Failures",
+    "A09": "A09 Security Logging & Monitoring Failures",
+    "A10": "A10 Server-Side Request Forgery",
+}
 
 SECURITY_HEADERS = [
     "Content-Security-Policy",
@@ -67,15 +83,27 @@ SECURITY_HEADERS = [
 ]
 
 TOOL_HINTS = {
+    # A03 Injection
     "sqlmap": "sqlmap -u \"{url}\" --batch --level=2 --risk=1",
     "dalfox": "dalfox url \"{url}\"",
+    "commix": "commix --url \"{url}\" --batch",
+    # A01 Broken Access Control
     "ffuf-lfi": "ffuf -u \"{url_marker}\" -w wordlists/lfi.txt -mc all",
     "ffuf-dir": "ffuf -u \"{base}/FUZZ\" -w wordlists/common.txt -mc 200,301,302,403",
+    "corsy": "corsy -u \"{url}\"",
+    # A02 Cryptographic Failures
+    "tlsx": "tlsx -u \"{host}\" -json -so",
+    # A05 Security Misconfiguration / A06 Vulnerable & Outdated Components
     "nuclei": "nuclei -u \"{url}\" -tags {tags}",
     "wpscan": "wpscan --url \"{base}\" --enumerate vp,vt,u",
     "git-dumper": "git-dumper \"{base}/.git\" ./loot/{host}-git",
+    "trivy": "trivy fs ./loot/{host}-git",
     "graphql-introspect": "curl -s -X POST \"{url}\" -H \"Content-Type: application/json\" "
                            "-d \"{{\\\"query\\\":\\\"{{__schema{{types{{name}}}}}}\\\"}}\"",
+    # A07 Identification & Authentication Failures
+    "jwt_tool": "jwt_tool \"{token}\" -M at",
+    # A10 Server-Side Request Forgery
+    "interactsh-client": "interactsh-client",
 }
 
 # Pure-Python tools vendored as source (no separate runtime needed) rather
@@ -83,6 +111,9 @@ TOOL_HINTS = {
 PY_SCRIPT_TOOLS = {
     "sqlmap": os.path.join("sqlmap", "sqlmap.py"),
     "git-dumper": os.path.join("git-dumper", "git_dumper.py"),
+    "commix": os.path.join("commix", "commix.py"),
+    "jwt_tool": os.path.join("jwt_tool", "jwt_tool.py"),
+    "corsy": os.path.join("corsy", "corsy.py"),
 }
 
 
@@ -144,6 +175,8 @@ class Recon:
         self.open_redirects = []   # [{url, param}]
         self.exposures = []        # [{host, kind, detail, severity}]
         self.possible_secrets = [] # [{source, snippet}]
+        self.jwts = []             # [{host, token}]
+        self.cors_hosts = []       # [{host, url, header}]
         self.suggestions = []      # built at the end
 
     def stop(self):
@@ -236,6 +269,13 @@ class Recon:
                     "host": host, "kind": "Missing security headers",
                     "detail": ", ".join(missing), "severity": "P5",
                 })
+            acao = r.headers.get("Access-Control-Allow-Origin", "")
+            if acao and (acao == "*" or "Access-Control-Allow-Credentials" in r.headers):
+                self.cors_hosts.append({"host": host, "url": r.url, "header": acao})
+            blob = " ".join("{}={}".format(k, v) for k, v in r.headers.items()) + " " + \
+                   " ".join("{}={}".format(k, v) for k, v in r.cookies.items())
+            for m in JWT_RE.finditer(blob):
+                self.jwts.append({"host": host, "token": m.group(0)})
             return {
                 "host": host, "url": r.url, "status": r.status_code,
                 "title": title, "server": server, "tech": tech,
@@ -411,32 +451,50 @@ class Recon:
         for exp in self.exposures:
             sev = exp["severity"]
             base = "https://" + exp["host"]
-            if "git" in exp["kind"].lower():
-                s.append(self._sug(exp["kind"], sev, exp["detail"],
-                                    "git-dumper", TOOL_HINTS["git-dumper"].format(base=base, host=exp["host"])))
-            elif ".env" in exp["kind"].lower():
+            kind = exp["kind"].lower()
+            if "git" in kind:
+                s.append(self._sug(exp["kind"], sev, exp["detail"], "git-dumper",
+                                    TOOL_HINTS["git-dumper"].format(base=base, host=exp["host"]), "A05"))
+                s.append(self._sug("Scan dumped source for known-vulnerable dependencies", "P3",
+                                    "./loot/{}-git".format(exp["host"]), "trivy",
+                                    TOOL_HINTS["trivy"].format(host=exp["host"]), "A06"))
+            elif ".env" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
-                                    "Open {} directly in a browser/curl and review for live credentials.".format(exp["detail"])))
-            elif "swagger" in exp["kind"].lower() or "openapi" in exp["kind"].lower():
+                                    "Open {} directly in a browser/curl and review for live credentials.".format(exp["detail"]),
+                                    "A05"))
+            elif "swagger" in kind or "openapi" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
-                                    "curl -s \"{}\" | jq '.paths | keys'".format(exp["detail"])))
-            elif "graphql" in exp["kind"].lower():
+                                    "curl -s \"{}\" | jq '.paths | keys'".format(exp["detail"]), "A05"))
+            elif "graphql" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "graphql-introspect",
-                                    TOOL_HINTS["graphql-introspect"].format(url=exp["detail"])))
-            elif "wordpress" in exp["kind"].lower():
+                                    TOOL_HINTS["graphql-introspect"].format(url=exp["detail"]), "A05"))
+            elif "wordpress" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "wpscan",
-                                    TOOL_HINTS["wpscan"].format(base=base)))
+                                    TOOL_HINTS["wpscan"].format(base=base), "A06"))
+            elif "missing security headers" in kind:
+                s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
+                                    "Add the missing headers; re-check with nuclei's misconfiguration templates.", "A05"))
             else:
-                s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review", "Review header/config hardening."))
+                s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
+                                    "Review header/config hardening.", "A05"))
 
         for ref in self.reflections:
             s.append(self._sug("Reflected parameter (possible XSS)", "P2", ref["url"],
-                                "dalfox", TOOL_HINTS["dalfox"].format(url=ref["url"])))
+                                "dalfox", TOOL_HINTS["dalfox"].format(url=ref["url"]), "A03"))
 
         for red in self.open_redirects:
             s.append(self._sug("Open redirect", "P3", "{} (param: {})".format(red["url"], red["param"]),
-                                "manual review", "Confirm impact (token leak / phishing chain) manually."))
+                                "manual review", "Confirm impact (token leak / phishing chain) manually.", "A01"))
 
+        for cors in self.cors_hosts:
+            s.append(self._sug("Permissive CORS header ({})".format(cors["header"]), "P3", cors["url"],
+                                "corsy", TOOL_HINTS["corsy"].format(url=cors["url"]), "A05"))
+
+        for jwt in self.jwts:
+            s.append(self._sug("JWT observed in traffic", "P4", jwt["host"], "jwt_tool",
+                                TOOL_HINTS["jwt_tool"].format(token=jwt["token"]), "A07"))
+
+        ssrf_seen = False
         for url, params in self.params.items():
             host = urlparse(url).netloc
             path = urlparse(url).path.lower()
@@ -444,43 +502,56 @@ class Recon:
                 pl = p.lower()
                 if pl in SQLI_PARAM_HINTS:
                     s.append(self._sug("SQLi candidate parameter '{}'".format(p), "P2", url,
-                                        "sqlmap", TOOL_HINTS["sqlmap"].format(url=url)))
+                                        "sqlmap", TOOL_HINTS["sqlmap"].format(url=url), "A03"))
+                if pl in CMDI_PARAM_HINTS:
+                    s.append(self._sug("OS command-injection candidate parameter '{}'".format(p), "P1", url,
+                                        "commix", TOOL_HINTS["commix"].format(url=url), "A03"))
                 if pl in LFI_PARAM_HINTS:
                     s.append(self._sug("LFI/path-traversal candidate parameter '{}'".format(p), "P2", url,
                                         "ffuf", TOOL_HINTS["ffuf-lfi"].format(
                                             url_marker=url.replace(p + "=" + parse_qs(urlsplit(url).query).get(p, [""])[0],
-                                                                    p + "=FUZZ"))))
+                                                                    p + "=FUZZ")), "A01"))
                 if pl in SSRF_PARAM_HINTS:
                     s.append(self._sug("SSRF candidate parameter '{}'".format(p), "P2", url,
-                                        "manual review / Burp Collaborator",
-                                        "Point {} at an out-of-band listener and watch for a callback.".format(p)))
+                                        "manual review / interactsh-client",
+                                        "Point {} at your interactsh listener URL and watch for a callback.".format(p),
+                                        "A10"))
+                    ssrf_seen = True
             if any(h in path for h in UPLOAD_PATH_HINTS):
                 s.append(self._sug("Upload endpoint discovered", "P3", url, "manual review",
-                                    "Test extension/MIME/magic-byte bypass and storage location manually."))
+                                    "Test extension/MIME/magic-byte bypass and storage location manually.", "A04"))
             if any(h in path for h in ADMIN_PATH_HINTS):
                 s.append(self._sug("Admin/internal path discovered", "P3", url, "manual review",
-                                    "Test for missing authz / IDOR / default creds on this panel."))
+                                    "Test for missing authz / IDOR / default creds on this panel.", "A01"))
+
+        if ssrf_seen:
+            s.append(self._sug("Start an out-of-band listener for blind SSRF/XXE", "P5", self.domain,
+                                "interactsh-client", TOOL_HINTS["interactsh-client"], "A10"))
 
         for host_rec in self.subdomains:
             if "wordpress" in host_rec.get("tech", []):
                 base = host_rec["url"]
-                s.append(self._sug("WordPress detected", "P4", base, "wpscan", TOOL_HINTS["wpscan"].format(base=base)))
+                s.append(self._sug("WordPress detected", "P4", base, "wpscan",
+                                    TOOL_HINTS["wpscan"].format(base=base), "A06"))
 
         if self.js_endpoints:
             sample = list(self.js_endpoints)[:1][0] if self.js_endpoints else ""
             s.append(self._sug("{} endpoint(s) mined from JS bundles".format(len(self.js_endpoints)), "P5",
-                                sample, "manual review", "Review js_endpoints list for undocumented API routes."))
+                                sample, "manual review", "Review js_endpoints list for undocumented API routes.", "A01"))
 
         for sec in self.possible_secrets:
             s.append(self._sug(sec["kind"], "P1", sec["source"], "manual review",
-                                "Rotate/revoke immediately if confirmed live: {}".format(sec["snippet"])))
+                                "Rotate/revoke immediately if confirmed live: {}".format(sec["snippet"]), "A02"))
 
         for host_rec in self.subdomains:
             if host_rec["host"] in (self.domain, "www." + self.domain) and \
                     host_rec["status"] and host_rec["status"] < 400:
                 s.append(self._sug("Run a nuclei template scan", "P4", host_rec["url"], "nuclei",
                                     TOOL_HINTS["nuclei"].format(url=host_rec["url"],
-                                                                 tags="cve,exposure,misconfig")))
+                                                                 tags="cve,exposure,misconfig"), "A06"))
+                if host_rec["url"].startswith("https://"):
+                    s.append(self._sug("Check TLS config / cipher suites", "P5", host_rec["host"], "tlsx",
+                                        TOOL_HINTS["tlsx"].format(host=host_rec["host"]), "A02"))
 
         sev_order = {"P1": 0, "P2": 1, "P3": 2, "P4": 3, "P5": 4}
         s.sort(key=lambda x: sev_order.get(x["severity"], 5))
@@ -488,9 +559,9 @@ class Recon:
         return s
 
     @staticmethod
-    def _sug(finding, severity, location, tool, command):
+    def _sug(finding, severity, location, tool, command, owasp=""):
         return {"finding": finding, "severity": severity, "location": location,
-                "tool": tool, "command": command}
+                "tool": tool, "command": command, "owasp": OWASP.get(owasp, owasp)}
 
 
 class App:
@@ -578,11 +649,12 @@ class App:
         f = ttk.Frame(self.nb)
         self.nb.add(f, text="Attack Suggestions")
 
-        cols = ("severity", "finding", "location", "tool")
+        cols = ("severity", "owasp", "finding", "location", "tool")
         self.sug_tree = ttk.Treeview(f, columns=cols, show="headings", height=14)
-        widths = {"severity": 60, "finding": 300, "location": 380, "tool": 140}
+        widths = {"severity": 55, "owasp": 210, "finding": 260, "location": 320, "tool": 120}
+        headings = {"owasp": "OWASP Top 10"}
         for c in cols:
-            self.sug_tree.heading(c, text=c.capitalize())
+            self.sug_tree.heading(c, text=headings.get(c, c.capitalize()))
             self.sug_tree.column(c, width=widths[c], anchor="w")
         self.sug_tree.pack(fill="both", expand=True)
         self.sug_tree.bind("<<TreeviewSelect>>", self._on_suggestion_select)
@@ -760,7 +832,7 @@ class App:
     def _refresh_suggestions(self):
         self.sug_tree.delete(*self.sug_tree.get_children())
         for s in self.recon.suggestions:
-            self.sug_tree.insert("", "end", values=(s["severity"], s["finding"], s["location"], s["tool"]),
+            self.sug_tree.insert("", "end", values=(s["severity"], s["owasp"], s["finding"], s["location"], s["tool"]),
                                   tags=(s["severity"],))
         self.sug_tree.tag_configure("P1", background="#3a1d1c")
         self.sug_tree.tag_configure("P2", background="#3a2a18")
@@ -916,7 +988,8 @@ class App:
                 self.ep_tree.insert("", "end", values=(url, ", ".join(params)))
             self.sug_tree.delete(*self.sug_tree.get_children())
             for s in recon_data.get("suggestions", []):
-                self.sug_tree.insert("", "end", values=(s["severity"], s["finding"], s["location"], s["tool"]))
+                self.sug_tree.insert("", "end", values=(s["severity"], s.get("owasp", ""), s["finding"],
+                                                          s["location"], s["tool"]))
         self.project_file = path
         self.status_var.set("Project loaded from {}".format(path))
 

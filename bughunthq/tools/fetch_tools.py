@@ -8,13 +8,24 @@ Run once before build.bat (safe to re-run any time to update tools):
 
     python tools\\fetch_tools.py
 
-What it does:
-  - Downloads official prebuilt Windows binaries for nuclei, subfinder,
-    ffuf and dalfox straight from their GitHub Releases (via the GitHub
-    API, so it always grabs the current release - no hardcoded version).
-  - Vendors sqlmap and git-dumper (pure Python, no separate runtime) as
-    source from their official repos, run later via this app's own
-    bundled interpreter.
+What it does, mapped to OWASP Top 10 (2021):
+  - A01 Broken Access Control    -> ffuf (already vendored for the LFI/dir
+    suggestions), corsy (CORS misconfig)
+  - A02 Cryptographic Failures   -> tlsx (TLS/cipher checks)
+  - A03 Injection                -> sqlmap (SQLi), dalfox (XSS), commix (OS
+    command injection)
+  - A05 Security Misconfiguration -> nuclei, git-dumper
+  - A06 Vulnerable & Outdated Components -> nuclei, trivy, wpscan
+  - A07 Identification & Auth Failures -> jwt_tool
+  - A10 Server-Side Request Forgery -> interactsh-client
+  (A04/A08/A09 are methodology/manual-review categories with no single
+  matching offensive tool - the app's suggestions still flag them.)
+
+Compiled (Go) tools are downloaded as the official prebuilt Windows binary
+straight from each project's GitHub Releases (via the GitHub API, so it
+always grabs the current release - no hardcoded version). Pure-Python tools
+are vendored as source and run later via this app's own bundled interpreter
+- no separate Python/Go install needed on the machine running the built exe.
 
 wpscan is intentionally skipped - it needs a Ruby runtime, which is a poor
 fit for a single-folder Windows bundle. Install it separately (see
@@ -26,8 +37,8 @@ import io
 import json
 import os
 import platform
+import re
 import stat
-import sys
 import tarfile
 import urllib.request
 import zipfile
@@ -37,22 +48,36 @@ GITHUB_API_LATEST = "https://api.github.com/repos/{}/releases/latest"
 UA = {"User-Agent": "BugHuntHQ-tools-fetcher"}
 
 # Compiled Go tools: fetched as the official prebuilt Windows release binary.
+# Value is either "owner/repo" or (owner/repo, asset_name_hint) for repos
+# whose releases bundle more than one binary (client vs server, etc).
 GO_TOOLS = {
     "nuclei": "projectdiscovery/nuclei",
     "subfinder": "projectdiscovery/subfinder",
     "ffuf": "ffuf/ffuf",
     "dalfox": "hahwul/dalfox",
+    "tlsx": "projectdiscovery/tlsx",
+    "trivy": "aquasecurity/trivy",
+    "interactsh-client": ("projectdiscovery/interactsh", "client"),
 }
 
 # Pure-Python tools: vendored as source, no compiled binary needed.
 PY_TOOLS = {
     "sqlmap": "https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip",
     "git-dumper": "https://github.com/arthaud/git-dumper/archive/refs/heads/master.zip",
+    "commix": "https://github.com/commixproject/commix/archive/refs/heads/master.zip",
+    "jwt_tool": "https://github.com/ticarpi/jwt_tool/archive/refs/heads/master.zip",
+    "corsy": "https://github.com/s0md3v/Corsy/archive/refs/heads/master.zip",
 }
 
 
 def is_windows():
     return platform.system().lower() == "windows"
+
+
+def norm(s):
+    """Lowercase and strip separators so 'Windows-64bit' == 'windows_amd64'
+    style naming differences between projects don't break matching."""
+    return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
 def os_tag():
@@ -64,25 +89,32 @@ def os_tag():
     return "linux"
 
 
-def arch_tag():
+def arch_aliases():
     machine = platform.machine().lower()
     if machine in ("amd64", "x86_64"):
-        return "amd64"
+        return ["amd64", "x8664", "x64", "64bit"]
     if machine in ("arm64", "aarch64"):
-        return "arm64"
-    return machine
+        return ["arm64", "aarch64"]
+    return [machine]
 
 
-def pick_asset(assets):
-    tag, arch = os_tag(), arch_tag()
-    same_os = [a for a in assets if tag in a["name"].lower()]
+def pick_asset(assets, name_hint=None):
+    tag = norm(os_tag())
+    same_os = [a for a in assets if tag in norm(a["name"])]
+    if name_hint:
+        narrowed = [a for a in same_os if norm(name_hint) in norm(a["name"])]
+        if narrowed:
+            same_os = narrowed
+    aliases = [norm(a) for a in arch_aliases()]
     for a in same_os:
-        if arch in a["name"].lower():
+        n = norm(a["name"])
+        if any(alias in n for alias in aliases):
             return a
     return same_os[0] if same_os else None
 
 
-def fetch_go_tool(name, repo):
+def fetch_go_tool(name, repo_spec):
+    repo, name_hint = repo_spec if isinstance(repo_spec, tuple) else (repo_spec, None)
     print("[*] Fetching {} ({})...".format(name, repo))
     try:
         req = urllib.request.Request(GITHUB_API_LATEST.format(repo), headers=UA)
@@ -92,7 +124,7 @@ def fetch_go_tool(name, repo):
         print("    [!] Could not query GitHub releases for {}: {}".format(name, e))
         return
 
-    asset = pick_asset(release.get("assets", []))
+    asset = pick_asset(release.get("assets", []), name_hint)
     if not asset:
         print("    [!] No matching release asset found for {} on this OS/arch; "
               "install it manually and put it on PATH instead.".format(name))

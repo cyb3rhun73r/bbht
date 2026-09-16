@@ -11,17 +11,16 @@ PyInstaller) that automates the recon → triage step of bug hunting:
   input and open redirects.
 - Checks for common exposures: `.git/HEAD`, `.env`, Swagger/OpenAPI specs,
   GraphQL endpoints, WordPress user enumeration, missing security headers.
-- **Smart suggestions:** turns every recon signal into a ranked (P1–P5) attack
-  hypothesis with a ready-to-copy command for the matching tool (sqlmap,
-  dalfox, ffuf, nuclei, wpscan, git-dumper, GraphQL introspection, etc).
-  Commands are never run automatically — you review, then Copy or Run them
-  yourself, and Run only works once you've checked the authorization box.
+- **Smart suggestions, mapped to OWASP Top 10 (2021):** turns every recon
+  signal into a ranked (P1–P5) attack hypothesis, tagged with its OWASP
+  category, with a ready-to-copy command for the matching tool. Commands are
+  never run automatically — you review, then Copy or Run them yourself, and
+  Run only works once you've checked the authorization box.
 - **Tools are bound into the app**, not something you install separately:
-  `tools\fetch_tools.py` downloads the official Windows binaries for nuclei,
-  subfinder, ffuf and dalfox and vendors sqlmap + git-dumper as source, all
-  into a `tools\` folder that ships next to `BugHuntHQ.exe` and that the app
-  checks automatically before falling back to PATH. `build.bat` runs this
-  for you.
+  `tools\fetch_tools.py` downloads official Windows binaries for the
+  compiled tools and vendors the pure-Python ones as source, all into a
+  `tools\` folder that ships next to `BugHuntHQ.exe` and that the app checks
+  automatically before falling back to PATH. `build.bat` runs this for you.
 - A findings log with severity/status tracking and one-click Markdown export.
 - Projects save/load as plain `.json` files on your machine — nothing is sent
   anywhere except the domain you scan and crt.sh for passive lookups.
@@ -57,27 +56,38 @@ a Windows machine* (it can't be cross-compiled from Linux/macOS):
 No Python installation is needed on machines that only *run* the built app —
 the exe carries its own interpreter, including for the vendored Python tools.
 
-## Bound attack tools
+## Bound attack tools — OWASP Top 10 (2021) coverage
 
 `tools\fetch_tools.py` (run automatically by `build.bat`, or run it yourself
 any time to update) fetches these straight into `tools\`, and the app checks
 that folder before PATH, so "Run" on a suggestion works out of the box:
 
-| Tool | Used for | How it's bundled | Project |
-|---|---|---|---|
-| subfinder | extra passive subdomain sources | official Windows binary | https://github.com/projectdiscovery/subfinder |
-| nuclei | template-based vuln scanning | official Windows binary | https://github.com/projectdiscovery/nuclei |
-| ffuf | fuzzing (LFI params, directories) | official Windows binary | https://github.com/ffuf/ffuf |
-| dalfox | reflected/DOM XSS confirmation | official Windows binary | https://github.com/hahwul/dalfox |
-| sqlmap | SQL injection confirmation | vendored source, run via the exe's own interpreter | https://github.com/sqlmapproject/sqlmap |
-| git-dumper | dumping an exposed `.git` directory | vendored source, run via the exe's own interpreter | https://github.com/arthaud/git-dumper |
+| OWASP category | Tool | Used for | How it's bundled | Project |
+|---|---|---|---|---|
+| A01 Broken Access Control | ffuf | directory/LFI-param fuzzing | official Windows binary | https://github.com/ffuf/ffuf |
+| A01 Broken Access Control | corsy | CORS misconfiguration | vendored source | https://github.com/s0md3v/Corsy |
+| A02 Cryptographic Failures | tlsx | TLS/cipher-suite checks | official Windows binary | https://github.com/projectdiscovery/tlsx |
+| A03 Injection | sqlmap | SQL injection confirmation | vendored source | https://github.com/sqlmapproject/sqlmap |
+| A03 Injection | dalfox | reflected/DOM XSS confirmation | official Windows binary | https://github.com/hahwul/dalfox |
+| A03 Injection | commix | OS command injection | vendored source | https://github.com/commixproject/commix |
+| A05 Security Misconfiguration | nuclei | template-based misconfig/CVE scanning | official Windows binary | https://github.com/projectdiscovery/nuclei |
+| A05 Security Misconfiguration | git-dumper | dumping an exposed `.git` directory | vendored source | https://github.com/arthaud/git-dumper |
+| A06 Vulnerable & Outdated Components | trivy | dependency/component vuln scanning (e.g. on git-dumper's loot) | official Windows binary | https://github.com/aquasecurity/trivy |
+| A06 Vulnerable & Outdated Components | wpscan | WordPress plugin/theme/core CVEs | *not bundled — see below* | https://github.com/wpscanteam/wpscan |
+| A07 Identification & Auth Failures | jwt_tool | JWT alg-confusion / tampering | vendored source | https://github.com/ticarpi/jwt_tool |
+| A10 Server-Side Request Forgery | interactsh-client | out-of-band callback listener for blind SSRF/XXE | official Windows binary | https://github.com/projectdiscovery/interactsh |
+| (recon) | subfinder | extra passive subdomain sources | official Windows binary | https://github.com/projectdiscovery/subfinder |
+
+A04 Insecure Design, A08 Software/Data Integrity Failures and A09 Security
+Logging & Monitoring Failures don't have a single matching offensive tool —
+they're methodology/manual-review findings, and the checklist side of Bug
+Hunt HQ (see the Artifact version) covers them step by step.
 
 **wpscan** is not bundled — it needs a Ruby runtime, a poor fit for a
-single-folder bundle. Install it separately (`gem install wpscan`, or see
-https://github.com/wpscanteam/wpscan) if you want that suggestion runnable;
-otherwise Copy still gives you the command to run in your own terminal.
-**amass** is likewise left to PATH if you prefer it over the bundled
-subfinder — same reasoning, optional extra.
+single-folder bundle. Install it separately (`gem install wpscan`) if you
+want that suggestion runnable; otherwise Copy still gives you the command to
+run in your own terminal. **amass** is likewise left to PATH if you prefer
+it over the bundled subfinder — same reasoning, optional extra.
 
 Re-running `fetch_tools.py` skips anything already vendored and re-downloads
 the latest release binaries, so it's safe to use as an "update tools" step.
