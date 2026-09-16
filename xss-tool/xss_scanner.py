@@ -32,6 +32,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from scope_validator import load_scope, check_scope
+import additional_checks
 
 MARKER = "bbhtXss7f3q"
 PAYLOADS = [
@@ -75,12 +76,21 @@ class ScanResult:
     findings: list = field(default_factory=list)
 
 
-def crawl(session: requests.Session, base_url: str, max_pages: int, delay: float) -> list:
-    """Same-origin breadth-first crawl, returns list of (url, html_text)."""
+def crawl(session: requests.Session, base_url: str, max_pages: int, delay: float) -> tuple:
+    """Same-origin breadth-first crawl.
+
+    Returns (pages, discovered_links):
+      - pages: list of (url, html_text) for successfully fetched HTML pages
+      - discovered_links: set of all same-origin hrefs seen, including ones
+        that redirect or return non-HTML (e.g. a "/redir?next=..." link),
+        so checks like open-redirect can test them even though they were
+        never added to `pages`.
+    """
     origin = urlparse(base_url).netloc
     seen = set()
     queue = [base_url]
     pages = []
+    discovered_links = set()
 
     while queue and len(pages) < max_pages:
         url = queue.pop(0)
@@ -99,10 +109,12 @@ def crawl(session: requests.Session, base_url: str, max_pages: int, delay: float
         soup = BeautifulSoup(resp.text, "html.parser")
         for a in soup.find_all("a", href=True):
             link = urljoin(url, a["href"])
-            if urlparse(link).netloc == origin and link not in seen:
-                queue.append(link)
+            if urlparse(link).netloc == origin:
+                discovered_links.add(link)
+                if link not in seen:
+                    queue.append(link)
 
-    return pages
+    return pages, discovered_links
 
 
 def classify_reflection(html_text: str, marker_payload: str) -> tuple:
@@ -215,7 +227,14 @@ def test_dom_sinks(page_url: str, html_text: str) -> list:
     return findings
 
 
-def scan(target: str, scope_path: str, max_pages: int, delay: float, confirm_authorized: bool) -> ScanResult:
+def scan(
+    target: str,
+    scope_path: str,
+    max_pages: int,
+    delay: float,
+    confirm_authorized: bool,
+    categories: set = frozenset({"xss", "open_redirect", "csrf", "access_control"}),
+) -> ScanResult:
     scope = load_scope(scope_path)
     result = check_scope(target, scope)
     if not result.in_scope:
@@ -235,14 +254,27 @@ def scan(target: str, scope_path: str, max_pages: int, delay: float, confirm_aut
     print(f"[*] Starting authorized single-target scan of {target}")
 
     session = requests.Session()
-    pages = crawl(session, target, max_pages, delay)
+    pages, discovered_links = crawl(session, target, max_pages, delay)
     print(f"[*] Crawled {len(pages)} page(s) within target origin")
 
     all_findings = []
     for url, html_text in pages:
-        all_findings.extend(test_reflected_params(session, url, delay))
-        all_findings.extend(test_forms(session, url, html_text, delay))
-        all_findings.extend(test_dom_sinks(url, html_text))
+        if "xss" in categories:
+            all_findings.extend(test_reflected_params(session, url, delay))
+            all_findings.extend(test_forms(session, url, html_text, delay))
+            all_findings.extend(test_dom_sinks(url, html_text))
+        if "csrf" in categories:
+            all_findings.extend(additional_checks.check_csrf_forms(url, html_text))
+        if "access_control" in categories:
+            all_findings.extend(additional_checks.check_access_control_hints(url, html_text))
+
+    if "open_redirect" in categories:
+        # Test every discovered same-origin link (not just fully-rendered
+        # HTML pages) so redirect-only endpoints like "/go?next=..." are
+        # actually exercised.
+        redirect_candidates = discovered_links | {url for url, _ in pages}
+        for link in redirect_candidates:
+            all_findings.extend(additional_checks.check_open_redirect(session, link, delay))
 
     return ScanResult(
         target=target,
@@ -263,10 +295,16 @@ def main():
         action="store_true",
         help="Required: attest you are authorized to test this specific target under the program's rules",
     )
+    parser.add_argument(
+        "--categories",
+        default="xss,open_redirect,csrf,access_control",
+        help="Comma-separated subset of: xss,open_redirect,csrf,access_control",
+    )
     parser.add_argument("--out", default="scan_result.json", help="Output JSON path")
     args = parser.parse_args()
 
-    result = scan(args.target, args.scope, args.max_pages, args.delay, args.confirm_authorized)
+    categories = {c.strip() for c in args.categories.split(",") if c.strip()}
+    result = scan(args.target, args.scope, args.max_pages, args.delay, args.confirm_authorized, categories)
 
     with open(args.out, "w") as f:
         json.dump(asdict(result), f, indent=2)

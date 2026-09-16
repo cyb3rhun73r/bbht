@@ -31,9 +31,15 @@ def main():
         action="store_true",
         help="Required: attest you are personally authorized to test this target",
     )
+    parser.add_argument(
+        "--categories",
+        default="xss,open_redirect,csrf,access_control",
+        help="Comma-separated subset of: xss,open_redirect,csrf,access_control",
+    )
     parser.add_argument("--out-json", default="scan_result.json")
     parser.add_argument("--out-report", default="report.md")
     args = parser.parse_args()
+    categories = {c.strip() for c in args.categories.split(",") if c.strip()}
 
     scope = load_scope(args.scope)
     result = check_scope(args.target, scope)
@@ -46,7 +52,7 @@ def main():
         sys.exit(1)
 
     print("[2/3] Running scan...")
-    scan_result = scan(args.target, args.scope, args.max_pages, args.delay, args.confirm_authorized)
+    scan_result = scan(args.target, args.scope, args.max_pages, args.delay, args.confirm_authorized, categories)
 
     import json
     from dataclasses import asdict
