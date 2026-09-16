@@ -1,0 +1,12 @@
+{
+  "program": "Example Corp Bug Bounty",
+  "in_scope": [
+    "app.example.com",
+    "*.example.com"
+  ],
+  "out_of_scope": [
+    "blog.example.com",
+    "app.example.com/logout"
+  ],
+  "notes": "Copy the actual published scope from the program page (e.g. HackerOne/Bugcrowd) before use. Do not test anything not explicitly listed here."
+}
