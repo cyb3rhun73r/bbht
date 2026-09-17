@@ -31,6 +31,28 @@ PyInstaller) that automates the recon → triage step of bug hunting:
 you enter. Only point it at assets you own or are explicitly authorized to
 test (an in-scope bug bounty asset, a client engagement, or your own lab).
 
+## Zero-touch prerequisite setup
+
+Nothing needs installing by hand beyond Python itself, and even that's
+attempted automatically:
+
+- **`build.bat`** checks for Python; if it's missing and `winget` is
+  available (built into Windows 11), it installs Python automatically. It
+  then creates the venv, installs `requirements.txt`, fetches every attack
+  tool and its own dependencies, fetches the MITRE ATT&CK dataset, and
+  builds the exe — one command, start to finish, on a completely clean
+  machine.
+- **The built app configures itself too.** The **Setup** tab (first tab)
+  shows what's present and what isn't, with "Download / Update" buttons for
+  the attack tools and the MITRE data — no need to touch a script or a
+  terminal, even for someone who only received the built `BugHuntHQ.exe`
+  from a teammate rather than building it themselves. On first launch with
+  nothing configured yet, the app asks once whether to fetch everything now.
+- Every fetch step is **idempotent and safe to re-run** any time you want
+  fresher tool binaries or the latest MITRE release — already-vendored
+  Python tools and their dependencies are skipped, compiled binaries and the
+  ATT&CK dataset are simply re-downloaded at their current version.
+
 ## Run it from source (any OS)
 
 ```
@@ -47,17 +69,27 @@ python bughunthq.py
 PyInstaller builds for the OS it runs on, so the `.exe` has to be built *on
 a Windows machine* (it can't be cross-compiled from Linux/macOS):
 
-1. Install Python 3.10+ from python.org, checking "Add python.exe to PATH".
-2. Copy this `bughunthq` folder onto your Windows 11 machine.
-3. Open Command Prompt in that folder and run `build.bat`.
-   - This also runs `tools\fetch_tools.py` (attack tools) and
+1. Copy this `bughunthq` folder onto your Windows 11 machine.
+2. Open Command Prompt in that folder and run `build.bat`.
+   - If Python isn't installed, it installs it via `winget` automatically,
+     then asks you to reopen Command Prompt and run `build.bat` again (Windows
+     only picks up the updated PATH in a new terminal). If `winget` isn't
+     available either, it prints the python.org download link and stops.
+   - It then creates the venv, installs `requirements.txt`, runs
+     `tools\fetch_tools.py` (attack tools + their own dependencies) and
      `tools\fetch_attack_data.py` (MITRE ATT&CK dataset, ~50MB one-time
-     download), then copies `tools\` next to the exe.
-4. Your app is the whole `dist\` folder — `BugHuntHQ.exe` plus `dist\tools\`
+     download), and freezes everything — including each vendored tool's own
+     pip dependencies, via `tools\extra-packages.txt` — into the exe with
+     PyInstaller.
+3. Your app is the whole `dist\` folder — `BugHuntHQ.exe` plus `dist\tools\`
    beside it. Copy/zip/share the folder as a unit; double-click the exe to run.
 
 No Python installation is needed on machines that only *run* the built app —
 the exe carries its own interpreter, including for the vendored Python tools.
+If you instead hand someone the exe without running `fetch_tools.py`/
+`fetch_attack_data.py` first, the app's own **Setup** tab fetches everything
+on first launch (see above) — building isn't the only path to a fully
+configured app.
 
 ## Bound attack tools — OWASP Top 10 (2021) coverage
 

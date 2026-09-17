@@ -150,6 +150,10 @@ PY_SCRIPT_TOOLS = {
     "corsy": os.path.join("corsy", "corsy.py"),
 }
 
+# Compiled binaries tools/fetch_tools.py fetches - kept in sync with that
+# script's GO_TOOLS keys, used here only to report Setup-tab status.
+GO_TOOL_NAMES = ["nuclei", "subfinder", "ffuf", "dalfox", "tlsx", "trivy", "interactsh-client"]
+
 
 def bundled_tools_dir():
     """Where fetch_tools.py vendors tools, and where the running app looks for them."""
@@ -698,7 +702,9 @@ class App:
 
         self._build_ui()
         self._refresh_mitre_ref()
+        self.refresh_setup_status()
         self.root.after(100, self._drain_queue)
+        self.root.after(300, self._maybe_prompt_first_run_setup)
 
     # ---------------- UI ----------------
 
@@ -728,6 +734,7 @@ class App:
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill="both", expand=True, padx=10, pady=8)
 
+        self._build_setup_tab()
         self._build_log_tab()
         self._build_hosts_tab()
         self._build_endpoints_tab()
@@ -735,6 +742,107 @@ class App:
         self._build_mitre_tab()
         self._build_findings_tab()
         self._build_about_tab()
+
+    def _build_setup_tab(self):
+        f = ttk.Frame(self.nb, padding=12)
+        self.nb.add(f, text="Setup")
+
+        ttk.Label(f, text="Prerequisites", font=("", 11, "bold")).pack(anchor="w")
+        ttk.Label(f, text="Everything below downloads/configures itself into the tools\\ "
+                           "folder next to this app - nothing needs installing by hand.",
+                  wraplength=820).pack(anchor="w", pady=(0, 10))
+
+        status = ttk.Frame(f)
+        status.pack(fill="x", pady=(0, 10))
+        self.setup_tools_var = tk.StringVar(value="Checking...")
+        self.setup_attack_var = tk.StringVar(value="Checking...")
+        row1 = ttk.Frame(status)
+        row1.pack(fill="x", pady=2)
+        ttk.Label(row1, text="Attack tools:", width=22).pack(side="left")
+        ttk.Label(row1, textvariable=self.setup_tools_var).pack(side="left")
+        row2 = ttk.Frame(status)
+        row2.pack(fill="x", pady=2)
+        ttk.Label(row2, text="MITRE ATT&CK data:", width=22).pack(side="left")
+        ttk.Label(row2, textvariable=self.setup_attack_var).pack(side="left")
+
+        btns = ttk.Frame(f)
+        btns.pack(fill="x", pady=(0, 10))
+        ttk.Button(btns, text="Download / Update Attack Tools",
+                   command=lambda: self.run_setup_script("fetch_tools.py")).pack(side="left", padx=(0, 8))
+        ttk.Button(btns, text="Download / Update MITRE ATT&CK Data",
+                   command=lambda: self.run_setup_script("fetch_attack_data.py")).pack(side="left", padx=(0, 8))
+        ttk.Button(btns, text="Refresh Status", command=self.refresh_setup_status).pack(side="left")
+
+        ttk.Label(f, text="Both are safe to re-run any time - already-vendored tools are "
+                           "skipped, compiled binaries and the ATT&CK dataset are re-fetched "
+                           "at their current release. Progress streams into the Recon Log tab.",
+                  wraplength=820, foreground="#888").pack(anchor="w", pady=(4, 0))
+
+    def refresh_setup_status(self):
+        tools_dir = bundled_tools_dir()
+        found_bin = [t for t in list(GO_TOOL_NAMES) if find_tool_path(t)]
+        found_py = [t for t in PY_SCRIPT_TOOLS
+                    if os.path.isfile(os.path.join(tools_dir, PY_SCRIPT_TOOLS[t]))]
+        if found_bin or found_py:
+            self.setup_tools_var.set("{} compiled + {} vendored found in {}".format(
+                len(found_bin), len(found_py), tools_dir))
+        else:
+            self.setup_tools_var.set("Not found - click \"Download / Update Attack Tools\" below")
+
+        idx = load_attack_index()
+        if idx:
+            self.setup_attack_var.set("Loaded - ATT&CK v{}, {} techniques".format(
+                idx.get("attack_version", "?"), len(idx.get("techniques", {}))))
+        else:
+            self.setup_attack_var.set("Not found - click \"Download / Update MITRE ATT&CK Data\" below")
+
+    def _maybe_prompt_first_run_setup(self):
+        tools_dir = bundled_tools_dir()
+        any_bin = any(find_tool_path(t) for t in GO_TOOL_NAMES)
+        any_py = any(os.path.isfile(os.path.join(tools_dir, p)) for p in PY_SCRIPT_TOOLS.values())
+        any_attack = bool(load_attack_index())
+        if any_bin or any_py or any_attack:
+            return  # something's already configured - don't nag on every launch
+        if messagebox.askyesno(
+                APP_NAME,
+                "No attack tools or MITRE ATT&CK data found yet.\n\n"
+                "Download and configure everything now? This fetches the attack tools "
+                "(a few hundred MB) and the MITRE ATT&CK dataset (~50MB) into tools\\ "
+                "next to this app - one-time, safe to re-run later from the Setup tab.\n\n"
+                "Requires an internet connection."):
+            self.nb.select(0)  # Setup tab
+            self.run_setup_script("fetch_tools.py")
+            self.run_setup_script("fetch_attack_data.py")
+
+    def run_setup_script(self, script_name):
+        script_path = os.path.join(bundled_tools_dir(), script_name)
+        if not os.path.isfile(script_path):
+            messagebox.showerror(APP_NAME, "{} not found at {}\n\nIf you're running the built "
+                                            "exe, it ships in tools\\ next to it - make sure you "
+                                            "copied the whole dist\\ folder, not just the "
+                                            "exe.".format(script_name, script_path))
+            return
+        if getattr(sys, "frozen", False):
+            argv = [sys.executable, "--bhq-pyscript", script_path]
+        else:
+            argv = [sys.executable, script_path]
+
+        self.nb.select(1)  # Recon Log tab
+        self.log("[*] Running {} ...".format(script_name))
+
+        def worker():
+            try:
+                proc = subprocess.Popen(argv, cwd=bundled_tools_dir(), stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, text=True, bufsize=1)
+                for line in proc.stdout:
+                    self.log(line.rstrip("\n"))
+                proc.wait()
+                self.log("[*] {} finished (exit code {}).".format(script_name, proc.returncode))
+            except Exception as e:
+                self.log("[!] {} failed to run: {}".format(script_name, e))
+            self.q.put(("setup_refresh", None))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_log_tab(self):
         f = ttk.Frame(self.nb)
@@ -964,6 +1072,9 @@ class App:
                     self.start_btn.config(state="normal")
                     self.stop_btn.config(state="disabled")
                     self.status_var.set("Recon finished.")
+                elif kind == "setup_refresh":
+                    self.refresh_setup_status()
+                    self._refresh_mitre_ref()
         except queue.Empty:
             pass
         self.root.after(150, self._drain_queue)

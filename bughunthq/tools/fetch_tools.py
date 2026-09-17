@@ -27,6 +27,15 @@ always grabs the current release - no hardcoded version). Pure-Python tools
 are vendored as source and run later via this app's own bundled interpreter
 - no separate Python/Go install needed on the machine running the built exe.
 
+Each vendored Python tool's OWN requirements.txt (whatever it currently
+declares upstream - not a hardcoded guess) is pip-installed into this same
+environment automatically, and the package names are written to
+tools\\extra-packages.txt so build.bat can tell PyInstaller to freeze them
+into the exe too (see build.bat). If this script runs inside the built exe
+itself (no pip available there), that step is skipped with a clear message
+- it only needs to happen once, in a real Python environment, before build.bat
+packages the app.
+
 wpscan is intentionally skipped - it needs a Ruby runtime, which is a poor
 fit for a single-folder Windows bundle. Install it separately (see
 README.md) if you want the wpscan suggestions to be runnable too.
@@ -39,6 +48,8 @@ import os
 import platform
 import re
 import stat
+import subprocess
+import sys
 import tarfile
 import urllib.request
 import zipfile
@@ -179,11 +190,63 @@ def fetch_go_tool(name, repo_spec):
         print("    [!] Could not locate the {} binary inside the downloaded archive.".format(name))
 
 
-def fetch_py_tool(name, zip_url):
+def pip_is_usable():
+    """False inside a frozen exe (no pip/site-packages to install into) or
+    when pip just isn't importable in this interpreter."""
+    if getattr(sys, "frozen", False):
+        return False
+    try:
+        import pip  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def package_name(requirement_line):
+    """'pycryptodomex>=3.9' -> 'pycryptodomex'."""
+    line = requirement_line.split("#", 1)[0].strip()
+    m = re.match(r"^[A-Za-z0-9_.\-]+", line)
+    return m.group(0) if m else None
+
+
+def install_tool_requirements(name, tool_dir, all_packages):
+    req_path = os.path.join(tool_dir, "requirements.txt")
+    if not os.path.isfile(req_path):
+        return
+    with open(req_path, "r", encoding="utf-8", errors="ignore") as fh:
+        lines = [l.strip() for l in fh if l.strip() and not l.strip().startswith("#")]
+    pkgs = [package_name(l) for l in lines]
+    all_packages.update(p for p in pkgs if p)
+
+    if not pip_is_usable():
+        print("    [!] {} declares dependencies ({}) but pip isn't available in this "
+              "environment - run fetch_tools.py from a normal `python` install (inside "
+              "build.bat's venv) so they get installed and frozen into the exe.".format(
+                  name, ", ".join(pkgs)))
+        return
+
+    # Installed one package at a time (not `pip install -r file` as a single
+    # transaction) so one upstream tool's fussy legacy dependency doesn't
+    # block the rest of that tool's - or every other tool's - packages.
+    print("    [*] Installing {}'s dependencies: {}".format(name, ", ".join(pkgs)))
+    for pkg in pkgs:
+        if not pkg:
+            continue
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-q", pkg],
+                            check=True, timeout=180)
+            print("        [+] {}".format(pkg))
+        except Exception as e:
+            print("        [!] {} failed to install ({}) - the tool may not run until "
+                  "this is resolved (try `pip install {}` by hand).".format(pkg, e, pkg))
+
+
+def fetch_py_tool(name, zip_url, all_packages):
     print("[*] Vendoring {}...".format(name))
     dest = os.path.join(HERE, name)
     if os.path.isdir(dest):
         print("    [=] Already present at {}".format(dest))
+        install_tool_requirements(name, dest, all_packages)
         return
     try:
         req = urllib.request.Request(zip_url, headers=UA)
@@ -196,6 +259,8 @@ def fetch_py_tool(name, zip_url):
         print("    [+] {} vendored at {}".format(name, dest))
     except Exception as e:
         print("    [!] Failed to vendor {}: {}".format(name, e))
+        return
+    install_tool_requirements(name, dest, all_packages)
 
 
 def main():
@@ -203,8 +268,18 @@ def main():
     print("Vendoring attack tools into: {}\n".format(HERE))
     for name, repo in GO_TOOLS.items():
         fetch_go_tool(name, repo)
+
+    all_packages = set()
     for name, url in PY_TOOLS.items():
-        fetch_py_tool(name, url)
+        fetch_py_tool(name, url, all_packages)
+
+    if all_packages:
+        manifest = os.path.join(HERE, "extra-packages.txt")
+        with open(manifest, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(sorted(all_packages)) + "\n")
+        print("\n[+] Wrote {} ({} package(s)) - build.bat freezes these into the exe "
+              "with PyInstaller's --collect-all.".format(manifest, len(all_packages)))
+
     print("\nDone. Bug Hunt HQ will auto-detect anything that landed in this folder.")
     print("wpscan needs a separate Ruby install - see README.md - it was skipped here.")
 
