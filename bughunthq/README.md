@@ -11,11 +11,13 @@ PyInstaller) that automates the recon → triage step of bug hunting:
   input and open redirects.
 - Checks for common exposures: `.git/HEAD`, `.env`, Swagger/OpenAPI specs,
   GraphQL endpoints, WordPress user enumeration, missing security headers.
-- **Smart suggestions, mapped to OWASP Top 10 (2021):** turns every recon
-  signal into a ranked (P1–P5) attack hypothesis, tagged with its OWASP
-  category, with a ready-to-copy command for the matching tool. Commands are
-  never run automatically — you review, then Copy or Run them yourself, and
-  Run only works once you've checked the authorization box.
+- **Smart suggestions, mapped to OWASP and MITRE ATT&CK:** turns every recon
+  signal into a ranked (P1–P5) attack hypothesis, tagged with its OWASP Top 10
+  (2021) category, its OWASP API Security Top 10 (2023) category where the
+  finding is API-shaped, and the MITRE ATT&CK (Enterprise) technique it maps
+  to once exploited — plus a ready-to-copy command for the matching tool.
+  Commands are never run automatically — you review, then Copy or Run them
+  yourself, and Run only works once you've checked the authorization box.
 - **Tools are bound into the app**, not something you install separately:
   `tools\fetch_tools.py` downloads official Windows binaries for the
   compiled tools and vendors the pure-Python ones as source, all into a
@@ -100,3 +102,27 @@ named `id`/`search`/`sort` is flagged as a SQLi candidate, `redirect`/`next`/
 candidates, an exposed `.env` as P1, a missing security header as P5, and so
 on. Tune `SQLI_PARAM_HINTS`, `LFI_PARAM_HINTS`, etc. at the top of the file
 to match your own methodology.
+
+## Framework mappings: OWASP + MITRE ATT&CK
+
+Every suggestion carries three tags, each resolved from a small dict near
+the top of `bughunthq.py` so they're easy to keep current as the frameworks
+update:
+
+- **`OWASP`** — OWASP Top 10 (2021), the current stable web-application list.
+- **`OWASP_API`** — OWASP API Security Top 10 (2023), applied alongside the
+  web Top 10 on findings that are API-shaped (SSRF, CORS, JWT, broken
+  function-level authz, GraphQL/Swagger inventory exposure).
+- **`MITRE`** — MITRE ATT&CK (Enterprise) technique/sub-technique IDs, e.g.
+  `T1190 Exploit Public-Facing Application` for SQLi/command injection,
+  `T1552.005 Unsecured Credentials: Cloud Instance Metadata API` for SSRF,
+  `T1505.003 Server Software Component: Web Shell` for unrestricted upload,
+  `T1606 Forge Web Credentials` for JWT tampering. This tells you not just
+  *what* the finding is, but where it sits in an actual attacker's
+  tactic/technique chain — useful when a report needs to speak both bug
+  bounty and enterprise-red-team language.
+
+When OWASP or MITRE publish a new revision, update the `OWASP`, `OWASP_API`
+or `MITRE` dict in `bughunthq.py` (and the `owasp="..."`/`mitre="..."` codes
+passed into each `self._sug(...)` call in `build_suggestions()`) — nothing
+else in the app needs to change.

@@ -73,6 +73,40 @@ OWASP = {
     "A10": "A10 Server-Side Request Forgery",
 }
 
+# OWASP API Security Top 10 (2023) - the current, API-specific companion list.
+# Applied alongside OWASP (web) Top 10 codes where a finding is API-shaped.
+OWASP_API = {
+    "API1": "API1:2023 Broken Object Level Authorization",
+    "API2": "API2:2023 Broken Authentication",
+    "API3": "API3:2023 Broken Object Property Level Authorization",
+    "API4": "API4:2023 Unrestricted Resource Consumption",
+    "API5": "API5:2023 Broken Function Level Authorization",
+    "API6": "API6:2023 Unrestricted Access to Sensitive Business Flows",
+    "API7": "API7:2023 Server Side Request Forgery",
+    "API8": "API8:2023 Security Misconfiguration",
+    "API9": "API9:2023 Improper Inventory Management",
+    "API10": "API10:2023 Unsafe Consumption of APIs",
+}
+
+# MITRE ATT&CK (Enterprise) technique the finding maps to once exploited -
+# gives every suggestion a tactic/technique, not just an OWASP category.
+MITRE = {
+    "T1190": "T1190 Exploit Public-Facing Application (Initial Access)",
+    "T1595.002": "T1595.002 Active Scanning: Vulnerability Scanning (Reconnaissance)",
+    "T1592.002": "T1592.002 Gather Victim Host Information: Software (Reconnaissance)",
+    "T1213": "T1213 Data from Information Repositories (Collection)",
+    "T1213.003": "T1213.003 Data from Information Repositories: Code Repositories (Collection)",
+    "T1588.006": "T1588.006 Obtain Capabilities: Vulnerabilities (Resource Development)",
+    "T1552.001": "T1552.001 Unsecured Credentials: Credentials In Files (Credential Access)",
+    "T1552.005": "T1552.005 Unsecured Credentials: Cloud Instance Metadata API (Credential Access)",
+    "T1539": "T1539 Steal Web Session Cookie (Credential Access)",
+    "T1606": "T1606 Forge Web Credentials (Credential Access)",
+    "T1078": "T1078 Valid Accounts (Initial Access/Persistence/Privilege Escalation)",
+    "T1204.001": "T1204.001 User Execution: Malicious Link (Execution)",
+    "T1505.003": "T1505.003 Server Software Component: Web Shell (Persistence)",
+    "T1530": "T1530 Data from Cloud Storage (Collection)",
+}
+
 SECURITY_HEADERS = [
     "Content-Security-Policy",
     "X-Frame-Options",
@@ -454,45 +488,50 @@ class Recon:
             kind = exp["kind"].lower()
             if "git" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "git-dumper",
-                                    TOOL_HINTS["git-dumper"].format(base=base, host=exp["host"]), "A05"))
+                                    TOOL_HINTS["git-dumper"].format(base=base, host=exp["host"]),
+                                    "A05", "T1213.003"))
                 s.append(self._sug("Scan dumped source for known-vulnerable dependencies", "P3",
                                     "./loot/{}-git".format(exp["host"]), "trivy",
-                                    TOOL_HINTS["trivy"].format(host=exp["host"]), "A06"))
+                                    TOOL_HINTS["trivy"].format(host=exp["host"]), "A06", "T1588.006"))
             elif ".env" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
                                     "Open {} directly in a browser/curl and review for live credentials.".format(exp["detail"]),
-                                    "A05"))
+                                    "A05", "T1552.001"))
             elif "swagger" in kind or "openapi" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
-                                    "curl -s \"{}\" | jq '.paths | keys'".format(exp["detail"]), "A05"))
+                                    "curl -s \"{}\" | jq '.paths | keys'".format(exp["detail"]),
+                                    "A05,API9", "T1213"))
             elif "graphql" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "graphql-introspect",
-                                    TOOL_HINTS["graphql-introspect"].format(url=exp["detail"]), "A05"))
+                                    TOOL_HINTS["graphql-introspect"].format(url=exp["detail"]),
+                                    "A05,API9", "T1213"))
             elif "wordpress" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "wpscan",
-                                    TOOL_HINTS["wpscan"].format(base=base), "A06"))
+                                    TOOL_HINTS["wpscan"].format(base=base), "A06", "T1588.006"))
             elif "missing security headers" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
-                                    "Add the missing headers; re-check with nuclei's misconfiguration templates.", "A05"))
+                                    "Add the missing headers; re-check with nuclei's misconfiguration templates.",
+                                    "A05", "T1592.002"))
             else:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "manual review",
-                                    "Review header/config hardening.", "A05"))
+                                    "Review header/config hardening.", "A05", "T1592.002"))
 
         for ref in self.reflections:
             s.append(self._sug("Reflected parameter (possible XSS)", "P2", ref["url"],
-                                "dalfox", TOOL_HINTS["dalfox"].format(url=ref["url"]), "A03"))
+                                "dalfox", TOOL_HINTS["dalfox"].format(url=ref["url"]), "A03", "T1059"))
 
         for red in self.open_redirects:
             s.append(self._sug("Open redirect", "P3", "{} (param: {})".format(red["url"], red["param"]),
-                                "manual review", "Confirm impact (token leak / phishing chain) manually.", "A01"))
+                                "manual review", "Confirm impact (token leak / phishing chain) manually.",
+                                "A01", "T1204.001"))
 
         for cors in self.cors_hosts:
             s.append(self._sug("Permissive CORS header ({})".format(cors["header"]), "P3", cors["url"],
-                                "corsy", TOOL_HINTS["corsy"].format(url=cors["url"]), "A05"))
+                                "corsy", TOOL_HINTS["corsy"].format(url=cors["url"]), "A05,API8", "T1539"))
 
         for jwt in self.jwts:
             s.append(self._sug("JWT observed in traffic", "P4", jwt["host"], "jwt_tool",
-                                TOOL_HINTS["jwt_tool"].format(token=jwt["token"]), "A07"))
+                                TOOL_HINTS["jwt_tool"].format(token=jwt["token"]), "A07,API2", "T1606"))
 
         ssrf_seen = False
         for url, params in self.params.items():
@@ -502,56 +541,61 @@ class Recon:
                 pl = p.lower()
                 if pl in SQLI_PARAM_HINTS:
                     s.append(self._sug("SQLi candidate parameter '{}'".format(p), "P2", url,
-                                        "sqlmap", TOOL_HINTS["sqlmap"].format(url=url), "A03"))
+                                        "sqlmap", TOOL_HINTS["sqlmap"].format(url=url), "A03", "T1190"))
                 if pl in CMDI_PARAM_HINTS:
                     s.append(self._sug("OS command-injection candidate parameter '{}'".format(p), "P1", url,
-                                        "commix", TOOL_HINTS["commix"].format(url=url), "A03"))
+                                        "commix", TOOL_HINTS["commix"].format(url=url), "A03", "T1190"))
                 if pl in LFI_PARAM_HINTS:
                     s.append(self._sug("LFI/path-traversal candidate parameter '{}'".format(p), "P2", url,
                                         "ffuf", TOOL_HINTS["ffuf-lfi"].format(
                                             url_marker=url.replace(p + "=" + parse_qs(urlsplit(url).query).get(p, [""])[0],
-                                                                    p + "=FUZZ")), "A01"))
+                                                                    p + "=FUZZ")), "A01", "T1190"))
                 if pl in SSRF_PARAM_HINTS:
                     s.append(self._sug("SSRF candidate parameter '{}'".format(p), "P2", url,
                                         "manual review / interactsh-client",
                                         "Point {} at your interactsh listener URL and watch for a callback.".format(p),
-                                        "A10"))
+                                        "A10,API7", "T1552.005"))
                     ssrf_seen = True
             if any(h in path for h in UPLOAD_PATH_HINTS):
                 s.append(self._sug("Upload endpoint discovered", "P3", url, "manual review",
-                                    "Test extension/MIME/magic-byte bypass and storage location manually.", "A04"))
+                                    "Test extension/MIME/magic-byte bypass and storage location manually.",
+                                    "A04", "T1505.003"))
             if any(h in path for h in ADMIN_PATH_HINTS):
                 s.append(self._sug("Admin/internal path discovered", "P3", url, "manual review",
-                                    "Test for missing authz / IDOR / default creds on this panel.", "A01"))
+                                    "Test for missing authz / IDOR / default creds on this panel.",
+                                    "A01,API5", "T1078"))
 
         if ssrf_seen:
             s.append(self._sug("Start an out-of-band listener for blind SSRF/XXE", "P5", self.domain,
-                                "interactsh-client", TOOL_HINTS["interactsh-client"], "A10"))
+                                "interactsh-client", TOOL_HINTS["interactsh-client"], "A10,API7", "T1552.005"))
 
         for host_rec in self.subdomains:
             if "wordpress" in host_rec.get("tech", []):
                 base = host_rec["url"]
                 s.append(self._sug("WordPress detected", "P4", base, "wpscan",
-                                    TOOL_HINTS["wpscan"].format(base=base), "A06"))
+                                    TOOL_HINTS["wpscan"].format(base=base), "A06", "T1592.002"))
 
         if self.js_endpoints:
             sample = list(self.js_endpoints)[:1][0] if self.js_endpoints else ""
             s.append(self._sug("{} endpoint(s) mined from JS bundles".format(len(self.js_endpoints)), "P5",
-                                sample, "manual review", "Review js_endpoints list for undocumented API routes.", "A01"))
+                                sample, "manual review", "Review js_endpoints list for undocumented API routes.",
+                                "A01,API9", "T1592.002"))
 
         for sec in self.possible_secrets:
             s.append(self._sug(sec["kind"], "P1", sec["source"], "manual review",
-                                "Rotate/revoke immediately if confirmed live: {}".format(sec["snippet"]), "A02"))
+                                "Rotate/revoke immediately if confirmed live: {}".format(sec["snippet"]),
+                                "A02", "T1552.001"))
 
         for host_rec in self.subdomains:
             if host_rec["host"] in (self.domain, "www." + self.domain) and \
                     host_rec["status"] and host_rec["status"] < 400:
                 s.append(self._sug("Run a nuclei template scan", "P4", host_rec["url"], "nuclei",
                                     TOOL_HINTS["nuclei"].format(url=host_rec["url"],
-                                                                 tags="cve,exposure,misconfig"), "A06"))
+                                                                 tags="cve,exposure,misconfig"),
+                                    "A06", "T1595.002"))
                 if host_rec["url"].startswith("https://"):
                     s.append(self._sug("Check TLS config / cipher suites", "P5", host_rec["host"], "tlsx",
-                                        TOOL_HINTS["tlsx"].format(host=host_rec["host"]), "A02"))
+                                        TOOL_HINTS["tlsx"].format(host=host_rec["host"]), "A02", "T1592.002"))
 
         sev_order = {"P1": 0, "P2": 1, "P3": 2, "P4": 3, "P5": 4}
         s.sort(key=lambda x: sev_order.get(x["severity"], 5))
@@ -559,9 +603,15 @@ class Recon:
         return s
 
     @staticmethod
-    def _sug(finding, severity, location, tool, command, owasp=""):
+    def _sug(finding, severity, location, tool, command, owasp="", mitre=""):
+        labels = []
+        for code in str(owasp).split(","):
+            code = code.strip()
+            if code:
+                labels.append(OWASP.get(code) or OWASP_API.get(code) or code)
         return {"finding": finding, "severity": severity, "location": location,
-                "tool": tool, "command": command, "owasp": OWASP.get(owasp, owasp)}
+                "tool": tool, "command": command,
+                "owasp": " · ".join(labels), "mitre": MITRE.get(mitre, mitre)}
 
 
 class App:
@@ -649,10 +699,10 @@ class App:
         f = ttk.Frame(self.nb)
         self.nb.add(f, text="Attack Suggestions")
 
-        cols = ("severity", "owasp", "finding", "location", "tool")
+        cols = ("severity", "owasp", "mitre", "finding", "location", "tool")
         self.sug_tree = ttk.Treeview(f, columns=cols, show="headings", height=14)
-        widths = {"severity": 55, "owasp": 210, "finding": 260, "location": 320, "tool": 120}
-        headings = {"owasp": "OWASP Top 10"}
+        widths = {"severity": 55, "owasp": 200, "mitre": 230, "finding": 240, "location": 260, "tool": 110}
+        headings = {"owasp": "OWASP Top 10", "mitre": "MITRE ATT&CK"}
         for c in cols:
             self.sug_tree.heading(c, text=headings.get(c, c.capitalize()))
             self.sug_tree.column(c, width=widths[c], anchor="w")
@@ -832,7 +882,8 @@ class App:
     def _refresh_suggestions(self):
         self.sug_tree.delete(*self.sug_tree.get_children())
         for s in self.recon.suggestions:
-            self.sug_tree.insert("", "end", values=(s["severity"], s["owasp"], s["finding"], s["location"], s["tool"]),
+            self.sug_tree.insert("", "end", values=(s["severity"], s["owasp"], s["mitre"],
+                                                      s["finding"], s["location"], s["tool"]),
                                   tags=(s["severity"],))
         self.sug_tree.tag_configure("P1", background="#3a1d1c")
         self.sug_tree.tag_configure("P2", background="#3a2a18")
@@ -988,8 +1039,8 @@ class App:
                 self.ep_tree.insert("", "end", values=(url, ", ".join(params)))
             self.sug_tree.delete(*self.sug_tree.get_children())
             for s in recon_data.get("suggestions", []):
-                self.sug_tree.insert("", "end", values=(s["severity"], s.get("owasp", ""), s["finding"],
-                                                          s["location"], s["tool"]))
+                self.sug_tree.insert("", "end", values=(s["severity"], s.get("owasp", ""), s.get("mitre", ""),
+                                                          s["finding"], s["location"], s["tool"]))
         self.project_file = path
         self.status_var.set("Project loaded from {}".format(path))
 
