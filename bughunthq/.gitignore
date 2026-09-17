@@ -5,7 +5,9 @@ build/
 dist/
 *.spec
 
-# tools/ is populated by tools/fetch_tools.py (binaries + vendored repos) -
-# never commit fetched/vendored third-party tools to this repo.
+# tools/ is populated by tools/fetch_tools.py (binaries + vendored repos) and
+# tools/fetch_attack_data.py (MITRE ATT&CK index) - never commit fetched/
+# vendored third-party data into this repo.
 tools/*
 !tools/fetch_tools.py
+!tools/fetch_attack_data.py

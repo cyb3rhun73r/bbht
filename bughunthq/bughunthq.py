@@ -189,6 +189,77 @@ def marker():
     return "bhq" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
 
+# ----------------------------------------------------------------------------
+# MITRE ATT&CK dataset (fetched/indexed by tools/fetch_attack_data.py). When
+# present, this replaces the hand-typed MITRE dict as the source of truth for
+# technique names/tactics and lets the app flag any code that doesn't exist
+# in the official data. When absent, everything still works off the
+# hand-typed fallback - this is an enhancement, not a hard dependency.
+# ----------------------------------------------------------------------------
+
+_attack_index_cache = None
+_attack_webapp_cache = None
+
+
+def load_attack_index():
+    global _attack_index_cache
+    if _attack_index_cache is not None:
+        return _attack_index_cache
+    path = os.path.join(bundled_tools_dir(), "attack-data", "enterprise-attack-index.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        _attack_index_cache = data
+    except Exception:
+        _attack_index_cache = False
+    return _attack_index_cache
+
+
+def load_attack_webapp_subset():
+    global _attack_webapp_cache
+    if _attack_webapp_cache is not None:
+        return _attack_webapp_cache
+    path = os.path.join(bundled_tools_dir(), "attack-data", "webapp-relevant.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        _attack_webapp_cache = data
+    except Exception:
+        _attack_webapp_cache = False
+    return _attack_webapp_cache
+
+
+def mitre_lookup(code):
+    """Resolve a bare technique ID like 'T1190' to a display label, preferring
+    the live ATT&CK dataset over the hand-typed MITRE fallback dict."""
+    if not code:
+        return ""
+    idx = load_attack_index()
+    if idx and code in idx.get("techniques", {}):
+        rec = idx["techniques"][code]
+        tactics = "/".join(rec["tactics_display"]) if rec["tactics_display"] else ""
+        return "{} {}{}".format(code, rec["name"], " ({})".format(tactics) if tactics else "")
+    return MITRE.get(code, code)
+
+
+def validate_mitre_codes(log_cb):
+    """Cross-check every technique ID this app's suggestion engine uses
+    against the live dataset, if loaded. Reports anything that no longer
+    resolves (renamed/deprecated upstream) instead of silently mislabeling."""
+    idx = load_attack_index()
+    if not idx:
+        log_cb("[*] No local MITRE ATT&CK dataset found - using built-in technique labels. "
+               "Run tools\\fetch_attack_data.py to fetch/validate against the live dataset.")
+        return
+    known = idx.get("techniques", {})
+    bad = [c for c in MITRE if c not in known]
+    log_cb("[*] MITRE ATT&CK dataset loaded (v{}, {} techniques) - mappings validated.".format(
+        idx.get("attack_version", "?"), len(known)))
+    if bad:
+        log_cb("[!] {} technique code(s) used by this app were not found in the current "
+               "dataset (renamed/deprecated?): {}".format(len(bad), ", ".join(bad)))
+
+
 class Recon:
     """Recon + light active-check engine. All network calls happen off the GUI thread."""
 
@@ -611,7 +682,7 @@ class Recon:
                 labels.append(OWASP.get(code) or OWASP_API.get(code) or code)
         return {"finding": finding, "severity": severity, "location": location,
                 "tool": tool, "command": command,
-                "owasp": " · ".join(labels), "mitre": MITRE.get(mitre, mitre)}
+                "owasp": " · ".join(labels), "mitre": mitre_lookup(mitre), "mitre_id": mitre}
 
 
 class App:
@@ -626,6 +697,7 @@ class App:
         self.project_file = None
 
         self._build_ui()
+        self._refresh_mitre_ref()
         self.root.after(100, self._drain_queue)
 
     # ---------------- UI ----------------
@@ -660,6 +732,7 @@ class App:
         self._build_hosts_tab()
         self._build_endpoints_tab()
         self._build_suggestions_tab()
+        self._build_mitre_tab()
         self._build_findings_tab()
         self._build_about_tab()
 
@@ -718,6 +791,34 @@ class App:
         self.run_btn = ttk.Button(bottom, text="Run (if tool installed)", command=self._run_cmd)
         self.run_btn.pack(side="left", padx=4)
         ttk.Button(bottom, text="Add as Finding", command=self._suggestion_to_finding).pack(side="left", padx=4)
+        ttk.Button(bottom, text="Export ATT&CK Navigator layer...",
+                   command=self.export_navigator_layer).pack(side="right", padx=4)
+
+    def _build_mitre_tab(self):
+        f = ttk.Frame(self.nb)
+        self.nb.add(f, text="MITRE Reference")
+
+        top = ttk.Frame(f, padding=(0, 0, 0, 6))
+        top.pack(fill="x")
+        self.mitre_status_var = tk.StringVar(value="Loading...")
+        ttk.Label(top, textvariable=self.mitre_status_var).pack(side="left")
+        self.mitre_search_var = tk.StringVar()
+        ttk.Entry(top, textvariable=self.mitre_search_var, width=30).pack(side="right")
+        ttk.Label(top, text="Filter:").pack(side="right", padx=(0, 4))
+        self.mitre_search_var.trace_add("write", lambda *a: self._refresh_mitre_ref())
+
+        cols = ("id", "tactic", "name")
+        self.mitre_tree = ttk.Treeview(f, columns=cols, show="headings")
+        widths = {"id": 90, "tactic": 180, "name": 480}
+        for c in cols:
+            self.mitre_tree.heading(c, text=c.capitalize())
+            self.mitre_tree.column(c, width=widths[c], anchor="w")
+        self.mitre_tree.pack(fill="both", expand=True)
+
+        ttk.Label(f, text="Curated to the web-application exploitation kill chain "
+                           "(reconnaissance through collection/exfiltration). Open a "
+                           "technique's page for details: attack.mitre.org/techniques/<ID>",
+                  wraplength=900, padding=(0, 6)).pack(anchor="w")
 
     def _build_findings_tab(self):
         f = ttk.Frame(self.nb)
@@ -815,6 +916,7 @@ class App:
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.status_var.set("Running recon against {} ...".format(domain))
+        validate_mitre_codes(self.log)
 
         def worker():
             try:
@@ -900,6 +1002,76 @@ class App:
         self.root.clipboard_clear()
         self.root.clipboard_append(self.cmd_var.get())
         self.status_var.set("Command copied to clipboard.")
+
+    # ---------------- MITRE reference + Navigator export ----------------
+
+    def _refresh_mitre_ref(self):
+        self.mitre_tree.delete(*self.mitre_tree.get_children())
+        idx = load_attack_index()
+        subset = load_attack_webapp_subset()
+        if not idx or not subset:
+            self.mitre_status_var.set(
+                "No local MITRE ATT&CK dataset. Run tools\\fetch_attack_data.py once to populate this tab.")
+            return
+        techniques = idx.get("techniques", {})
+        ids = subset.get("technique_ids", [])
+        self.mitre_status_var.set("ATT&CK v{} - {} web-app-relevant techniques".format(
+            idx.get("attack_version", "?"), len(ids)))
+        q = self.mitre_search_var.get().strip().lower()
+        for tid in ids:
+            rec = techniques.get(tid)
+            if not rec:
+                continue
+            tactic = "/".join(rec["tactics_display"])
+            if q and q not in tid.lower() and q not in rec["name"].lower() and q not in tactic.lower():
+                continue
+            self.mitre_tree.insert("", "end", values=(tid, tactic, rec["name"]))
+
+    def export_navigator_layer(self):
+        if not self.recon or not self.recon.suggestions:
+            messagebox.showinfo(APP_NAME, "Run recon first - there are no suggestions to export yet.")
+            return
+        counts = {}
+        comments = {}
+        for s in self.recon.suggestions:
+            tid = s.get("mitre_id", "")
+            if not tid:
+                continue
+            counts[tid] = counts.get(tid, 0) + 1
+            comments.setdefault(tid, []).append(s["finding"])
+        if not counts:
+            messagebox.showinfo(APP_NAME, "None of the current suggestions carry a MITRE technique ID.")
+            return
+        layer = {
+            "name": "Bug Hunt HQ - {} - {}".format(
+                self.domain_var.get().strip() or "target", datetime.now().strftime("%Y-%m-%d")),
+            "versions": {"attack": "16", "navigator": "5.1.0", "layer": "4.5"},
+            "domain": "enterprise-attack",
+            "description": "Techniques observed during recon/triage. Import at "
+                            "https://mitre-attack.github.io/attack-navigator/",
+            "techniques": [
+                {
+                    "techniqueID": tid,
+                    "score": count,
+                    "comment": "; ".join(comments[tid][:5]),
+                    "enabled": True,
+                }
+                for tid, count in sorted(counts.items())
+            ],
+            "gradient": {"colors": ["#ffffff", "#ff6666"], "minValue": 0,
+                         "maxValue": max(counts.values())},
+            "legendItems": [],
+            "showTacticRowBackground": True,
+            "sorting": 0,
+        }
+        path = filedialog.asksaveasfilename(defaultextension=".json",
+                                             filetypes=[("ATT&CK Navigator layer", "*.json")],
+                                             initialfile="bughunthq-navigator-layer.json")
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(layer, fh, indent=2)
+        self.status_var.set("Navigator layer exported to {} - import it at mitre-attack.github.io/attack-navigator".format(path))
 
     def _run_cmd(self):
         cmd = self.cmd_var.get().strip()

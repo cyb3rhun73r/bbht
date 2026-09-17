@@ -50,8 +50,9 @@ a Windows machine* (it can't be cross-compiled from Linux/macOS):
 1. Install Python 3.10+ from python.org, checking "Add python.exe to PATH".
 2. Copy this `bughunthq` folder onto your Windows 11 machine.
 3. Open Command Prompt in that folder and run `build.bat`.
-   - This also runs `tools\fetch_tools.py`, which downloads/vendors the
-     attack tools below into `tools\` and copies that folder next to the exe.
+   - This also runs `tools\fetch_tools.py` (attack tools) and
+     `tools\fetch_attack_data.py` (MITRE ATT&CK dataset, ~50MB one-time
+     download), then copies `tools\` next to the exe.
 4. Your app is the whole `dist\` folder — `BugHuntHQ.exe` plus `dist\tools\`
    beside it. Copy/zip/share the folder as a unit; double-click the exe to run.
 
@@ -126,3 +127,39 @@ When OWASP or MITRE publish a new revision, update the `OWASP`, `OWASP_API`
 or `MITRE` dict in `bughunthq.py` (and the `owasp="..."`/`mitre="..."` codes
 passed into each `self._sug(...)` call in `build_suggestions()`) — nothing
 else in the app needs to change.
+
+## MITRE ATT&CK is automated, not hand-typed
+
+`tools\fetch_attack_data.py` downloads the **official MITRE ATT&CK
+(Enterprise) dataset** straight from
+https://github.com/mitre-attack/attack-stix-data (the STIX 2.1 source MITRE
+itself publishes) and builds two small local files under
+`tools\attack-data\`:
+
+- **`enterprise-attack-index.json`** — every current (non-deprecated)
+  technique/sub-technique: ID, name, tactic(s), URL. Once this exists, the
+  app resolves every `T####` code against it instead of the hand-typed
+  `MITRE` dict, so labels always match the live data. On every "Start
+  Recon", the Recon Log reports the loaded ATT&CK version and **flags any
+  technique ID this app uses that the dataset doesn't recognize** (renamed
+  or deprecated upstream) — so a stale mapping shows up immediately instead
+  of silently mislabeling a finding.
+- **`webapp-relevant.json`** — a curated subset (recon through
+  collection/exfiltration tactics, filtered to web/API/cloud-relevant
+  keywords) that powers the new **MITRE Reference** tab: a searchable,
+  always-current-if-you-rerun-the-script browsable list of ATT&CK techniques
+  relevant to web-app exploitation, independent of what your last recon run
+  actually found.
+
+**Export ATT&CK Navigator layer** (button on the Attack Suggestions tab)
+turns the current recon's suggestions into a standard [ATT&CK Navigator]
+(https://mitre-attack.github.io/attack-navigator/) layer JSON — technique
+IDs scored by how many findings hit them, with the finding titles as
+comments. Import it at that URL to get the official heat-map visualization
+of what this engagement actually touched, ready to drop into a report.
+
+Nothing above is a hard dependency — if you never run
+`fetch_attack_data.py`, the app falls back to its built-in `MITRE` dict
+(already validated against the live dataset as of this writing) and the
+MITRE Reference tab just tells you how to populate it. Re-run the script any
+time to pick up MITRE's latest release.
