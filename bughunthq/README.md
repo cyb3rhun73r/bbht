@@ -7,10 +7,26 @@ PyInstaller) that automates the recon → triage step of bug hunting:
   when bundled or on PATH) and liveness/tech-fingerprint checks.
 - Crawls live hosts, mines JS bundles for hidden endpoints, and flags possible
   hardcoded secrets.
-- Discovers URL parameters and runs safe, single-request checks for reflected
-  input and open redirects.
+- Discovers URL parameters and runs safe, single-request confirmation checks:
+  reflection (XSS), open redirect, SSTI (arithmetic-evaluation confirmed, not
+  guessed), CRLF/header injection, unkeyed-header cache poisoning, and (only
+  when a 429 was actually seen) rate-limit bypass via spoofed source headers.
 - Checks for common exposures: `.git/HEAD`, `.env`, Swagger/OpenAPI specs,
   GraphQL endpoints, WordPress user enumeration, missing security headers.
+  Any JWT seen in traffic gets its header decoded locally (no extra request)
+  to flag a weak/symmetric or `none` algorithm immediately.
+- **Attack Chains tab:** aggregates findings that combine into a bigger story
+  (e.g. SSRF → cloud metadata credential theft, exposed `.git` + hardcoded
+  secrets → credential harvesting, weak JWT + admin path → forged-token
+  privilege escalation) with the manual steps to realize each one. This is
+  reasoning/reporting only — it never fires a request or chains exploits
+  itself.
+- **Advanced Tools tab:** a CORS-exploit PoC generator (writes a standalone
+  HTML page demonstrating cross-origin credential theft — evidence for a
+  report, not something the app does to the target) and a race-condition
+  tester (fires N parallel requests at one endpoint you specify, gated behind
+  typing the target hostname to confirm — this can cause real duplicate side
+  effects, so it's deliberately more friction than everything else here).
 - **Smart suggestions, mapped to OWASP and MITRE ATT&CK:** turns every recon
   signal into a ranked (P1–P5) attack hypothesis, tagged with its OWASP Top 10
   (2021) category, its OWASP API Security Top 10 (2023) category where the

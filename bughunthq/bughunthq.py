@@ -206,6 +206,19 @@ def marker():
     return "bhq" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
 
+def decode_jwt_header(token):
+    """Pure local inspection - no network request. base64url-decodes the JWT
+    header segment to read its declared alg/kid without needing jwt_tool."""
+    import base64
+    try:
+        header_b64 = token.split(".")[0]
+        header_b64 += "=" * (-len(header_b64) % 4)
+        header = json.loads(base64.urlsafe_b64decode(header_b64))
+        return {"alg": header.get("alg", "?"), "kid": header.get("kid")}
+    except Exception:
+        return {"alg": "?", "kid": None}
+
+
 # ----------------------------------------------------------------------------
 # MITRE ATT&CK dataset (fetched/indexed by tools/fetch_attack_data.py). When
 # present, this replaces the hand-typed MITRE dict as the source of truth for
@@ -299,7 +312,13 @@ class Recon:
         self.possible_secrets = [] # [{source, snippet}]
         self.jwts = []             # [{host, token}]
         self.cors_hosts = []       # [{host, url, header}]
+        self.ssti_findings = []    # [{url, param, engine}]
+        self.crlf_findings = []    # [{url, param}]
+        self.cache_poison_findings = []     # [{url, header}]
+        self.ratelimited_urls = set()       # URLs that returned 429 somewhere
+        self.ratelimit_bypass_findings = [] # [{url, header_value}]
         self.suggestions = []      # built at the end
+        self.chains = []           # built after suggestions: multi-finding attack chains
 
     def stop(self):
         self.stop_flag.set()
@@ -398,7 +417,8 @@ class Recon:
             blob = " ".join("{}={}".format(k, v) for k, v in r.headers.items()) + " " + \
                    " ".join("{}={}".format(k, v) for k, v in r.cookies.items())
             for m in JWT_RE.finditer(blob):
-                self.jwts.append({"host": host, "token": m.group(0)})
+                token = m.group(0)
+                self.jwts.append({"host": host, "token": token, "header": decode_jwt_header(token)})
             return {
                 "host": host, "url": r.url, "status": r.status_code,
                 "title": title, "server": server, "tech": tech,
@@ -456,6 +476,8 @@ class Recon:
                 continue
             seen.add(url)
             r = self._get(url)
+            if r is not None and r.status_code == 429:
+                self.ratelimited_urls.add(url)
             if r is None or "text/html" not in r.headers.get("Content-Type", ""):
                 continue
             self.crawled_urls.add(url)
@@ -520,14 +542,23 @@ class Recon:
                 self.exposures.append({"host": host, "kind": label, "detail": url, "severity": sev})
                 self.log("    [!] {}: {}".format(label, url))
 
-    # ---------------- safe active checks: reflection + open redirect ----------------
+    # ---------------- safe active checks: reflection, redirect, SSTI, CRLF ----------------
+
+    @staticmethod
+    def _with_param(url, param, value):
+        parts = urlsplit(url)
+        qs = parse_qs(parts.query)
+        qs[param] = [value]
+        new_query = "&".join("{}={}".format(k, v[0]) for k, v in qs.items())
+        return parts._replace(query=new_query).geturl()
 
     def test_params(self):
         all_urls = set(self.params.keys())
         if not all_urls:
             self.log("[*] No parameterized URLs discovered to test.")
             return
-        self.log("[*] Testing {} parameterized URL(s) for reflection / open-redirect...".format(len(all_urls)))
+        self.log("[*] Testing {} parameterized URL(s) for reflection / SSTI / CRLF / "
+                 "open-redirect...".format(len(all_urls)))
         budget = self.opts.get("max_param_tests", 60)
         tested = 0
         for url in all_urls:
@@ -538,19 +569,21 @@ class Recon:
                     break
                 tested += 1
                 self._test_reflection(url, param)
+                self._test_ssti(url, param)
+                self._test_crlf(url, param)
                 pname = param.lower()
                 if pname in REDIRECT_PARAM_HINTS:
                     self._test_open_redirect(url, param)
-        self.log("    [+] {} reflection findings, {} open-redirect findings".format(
-            len(self.reflections), len(self.open_redirects)))
+        self.log("    [+] {} reflection, {} SSTI, {} CRLF, {} open-redirect finding(s)".format(
+            len(self.reflections), len(self.ssti_findings), len(self.crlf_findings),
+            len(self.open_redirects)))
+
+        self.test_cache_poisoning()
+        self.test_ratelimit_bypass()
 
     def _test_reflection(self, url, param):
         mk = marker()
-        parts = urlsplit(url)
-        qs = parse_qs(parts.query)
-        qs[param] = [mk]
-        new_query = "&".join("{}={}".format(k, v[0]) for k, v in qs.items())
-        test_url = parts._replace(query=new_query).geturl()
+        test_url = self._with_param(url, param, mk)
         r = self._get(test_url)
         if r is not None and mk in r.text:
             idx = r.text.find(mk)
@@ -559,16 +592,63 @@ class Recon:
 
     def _test_open_redirect(self, url, param):
         target = "https://example.org/bhq-redirect-check"
-        parts = urlsplit(url)
-        qs = parse_qs(parts.query)
-        qs[param] = [target]
-        new_query = "&".join("{}={}".format(k, v[0]) for k, v in qs.items())
-        test_url = parts._replace(query=new_query).geturl()
+        test_url = self._with_param(url, param, target)
         r = self._get(test_url, allow_redirects=False)
         if r is not None and r.status_code in (301, 302, 303, 307, 308):
             loc = r.headers.get("Location", "")
             if "example.org" in loc:
                 self.open_redirects.append({"url": test_url, "param": param})
+
+    def _test_ssti(self, url, param):
+        a, b = random.randint(11, 19), random.randint(23, 29)
+        product = str(a * b)
+        payloads = {
+            "Jinja2/Twig/Django": "{{{{{}*{}}}}}".format(a, b),
+            "FreeMarker/EL/Velocity": "${{{}*{}}}".format(a, b),
+            "ERB (Ruby)": "<%= {}*{} %>".format(a, b),
+        }
+        for engine, payload in payloads.items():
+            if self.stop_flag.is_set():
+                return
+            test_url = self._with_param(url, param, payload)
+            r = self._get(test_url)
+            if r is not None and product in r.text and payload not in r.text:
+                self.ssti_findings.append({"url": test_url, "param": param, "engine": engine})
+                return  # one confirmed hit is enough for this param
+
+    def _test_crlf(self, url, param):
+        marker_header = "X-Bhq-Crlf-" + marker()[:8]
+        payload = "%0d%0a{}: 1".format(marker_header)
+        test_url = self._with_param(url, param, payload)
+        r = self._get(test_url)
+        if r is not None and marker_header.lower() in {h.lower() for h in r.headers.keys()}:
+            self.crlf_findings.append({"url": test_url, "param": param})
+
+    def test_cache_poisoning(self):
+        """Unkeyed-header probe: reflect a marker Host into the response of the
+        homepage of each live host. One extra GET per host - bounded, safe."""
+        live = [s for s in self.subdomains if s["status"] and s["status"] < 400]
+        for rec in live[: self.opts.get("crawl_max_hosts", 5)]:
+            if self.stop_flag.is_set():
+                return
+            probe_host = "bhq-cache-probe.invalid"
+            r = self._get(rec["url"], headers={"X-Forwarded-Host": probe_host})
+            if r is not None and probe_host in r.text:
+                self.cache_poison_findings.append({"url": rec["url"], "header": "X-Forwarded-Host"})
+
+    def test_ratelimit_bypass(self):
+        """Only fires if a 429 was actually observed somewhere - then sends two
+        extra GETs with spoofed source-IP headers to see if the limit resets."""
+        if not self.ratelimited_urls:
+            return
+        for url in list(self.ratelimited_urls)[:5]:
+            if self.stop_flag.is_set():
+                return
+            for spoof_ip in ("127.0.0.1", "10.0.0.{}".format(random.randint(2, 254))):
+                r = self._get(url, headers={"X-Forwarded-For": spoof_ip, "X-Real-IP": spoof_ip})
+                if r is not None and r.status_code != 429:
+                    self.ratelimit_bypass_findings.append({"url": url, "header_value": spoof_ip})
+                    break
 
     # ---------------- suggestion engine ----------------
 
@@ -623,8 +703,54 @@ class Recon:
                                 "corsy", TOOL_HINTS["corsy"].format(url=cors["url"]), "A05,API8", "T1539"))
 
         for jwt in self.jwts:
-            s.append(self._sug("JWT observed in traffic", "P4", jwt["host"], "jwt_tool",
+            hdr = jwt.get("header", {})
+            alg = hdr.get("alg", "?")
+            if alg in ("HS256", "HS384", "HS512"):
+                finding = "JWT uses symmetric alg {} (secret may be guessable/crackable)".format(alg)
+                sev = "P2"
+            elif alg == "none":
+                finding = "JWT declares alg:none (server may accept unsigned tokens!)"
+                sev = "P1"
+            else:
+                finding = "JWT observed in traffic (alg: {})".format(alg)
+                sev = "P4"
+            s.append(self._sug(finding, sev, jwt["host"], "jwt_tool",
                                 TOOL_HINTS["jwt_tool"].format(token=jwt["token"]), "A07,API2", "T1606"))
+
+        for ssti in self.ssti_findings:
+            s.append(self._sug("SSTI confirmed ({})".format(ssti["engine"]), "P1", ssti["url"],
+                                "manual review",
+                                "Confirmed via arithmetic evaluation - escalate manually toward RCE "
+                                "(engine-specific payloads, e.g. os.popen for Jinja2).", "A03", "T1190"))
+
+        for crlf in self.crlf_findings:
+            s.append(self._sug("CRLF / header injection confirmed", "P2", crlf["url"],
+                                "manual review",
+                                "Injected header was reflected - chase request smuggling / cache "
+                                "poisoning / response splitting manually.", "A05", "T1190"))
+
+        for cp in self.cache_poison_findings:
+            s.append(self._sug("Unkeyed header reflected (possible cache poisoning)", "P2", cp["url"],
+                                "manual review",
+                                "{} was reflected into the response - if this response is cacheable, "
+                                "confirm poisoning impact with a second, unauthenticated client.".format(
+                                    cp["header"]), "A05", "T1190"))
+
+        for rl in self.ratelimit_bypass_findings:
+            s.append(self._sug("Rate limiting bypassed via spoofed source header", "P3", rl["url"],
+                                "manual review",
+                                "A spoofed X-Forwarded-For/X-Real-IP got past the 429 - retest with "
+                                "burp intruder to confirm brute-force/enumeration is now unthrottled.",
+                                "A04", "T1110"))
+
+        for url, params in self.params.items():
+            path = urlparse(url).path.lower()
+            if "api" in path and any(p.lower() in ("id", "user_id", "role", "type") for p in params):
+                s.append(self._sug("Possible mass-assignment target (API write endpoint)", "P3", url,
+                                    "manual review",
+                                    "curl -X POST \"{}\" -H \"Content-Type: application/json\" "
+                                    "-d '{{\"isAdmin\":true,\"role\":\"admin\"}}' -i".format(url),
+                                    "A01,API3", "T1190"))
 
         ssrf_seen = False
         for url, params in self.params.items():
@@ -695,6 +821,80 @@ class Recon:
         self.suggestions = s
         return s
 
+    # ---------------- attack chains: aggregate findings into a narrative ----------------
+    # This is reasoning/reporting only - it never fires a request or executes a
+    # multi-step attack itself. It looks at findings already produced above and,
+    # when several of them combine into a known higher-impact pattern, writes up
+    # the chain and the manual steps a human would take to realize it.
+
+    def build_attack_chains(self):
+        chains = []
+        finding_texts = [s["finding"] for s in self.suggestions]
+
+        def has(substr):
+            return any(substr.lower() in f.lower() for f in finding_texts)
+
+        if has("SSRF candidate"):
+            chains.append(self._chain(
+                "SSRF -> Cloud Metadata -> Credential Theft", "P1", "A10,API7", "T1552.005",
+                "An SSRF-candidate parameter was found.",
+                "1. Point the parameter at http://169.254.169.254/latest/meta-data/iam/security-credentials/\n"
+                "2. If cloud credentials come back, use them (read-only enumeration first) to confirm scope\n"
+                "3. Report as cloud account/infrastructure compromise, not a bare SSRF"))
+
+        csp_missing = any(e["kind"] == "Missing security headers" and "Content-Security-Policy" in e["detail"]
+                           for e in self.exposures)
+        if has("reflected parameter") and csp_missing:
+            chains.append(self._chain(
+                "Reflected XSS + No CSP -> Session/Token Theft", "P1", "A03", "T1539",
+                "A reflected-XSS candidate exists and the same host has no Content-Security-Policy.",
+                "1. Confirm the XSS actually executes (dalfox / manual payload)\n"
+                "2. With no CSP to block it, craft a payload that exfiltrates document.cookie / "
+                "localStorage to an attacker-controlled endpoint\n"
+                "3. Report combined severity as session/account takeover, not just 'reflected XSS'"))
+
+        git_exposed = any("git" in e["kind"].lower() for e in self.exposures)
+        if git_exposed and self.possible_secrets:
+            chains.append(self._chain(
+                "Source Disclosure -> Credential Harvesting", "P1", "A05", "T1213.003",
+                "An exposed .git directory and possible hardcoded secrets in JS were both found.",
+                "1. git-dumper the repository\n"
+                "2. Grep the recovered history (not just HEAD) for credentials/API keys - secrets "
+                "removed in a later commit often still exist in git history\n"
+                "3. Validate any recovered credential against the live service before reporting"))
+
+        weak_jwt = any(j.get("header", {}).get("alg") in ("HS256", "HS384", "HS512", "none") for j in self.jwts)
+        if weak_jwt and has("admin/internal path"):
+            chains.append(self._chain(
+                "Weak JWT -> Forged Admin Token -> Privilege Escalation", "P1", "A07,API5", "T1606",
+                "A symmetric/none-alg JWT was observed and an admin/internal path was discovered.",
+                "1. jwt_tool -M at (alg:none) or crack the HS256 secret offline\n"
+                "2. Forge a token with an elevated role/claim\n"
+                "3. Replay it against the admin/internal path found during recon"))
+
+        if self.cors_hosts and self.jwts:
+            chains.append(self._chain(
+                "Permissive CORS -> Cross-Origin Token Theft", "P1", "A05,API8", "T1539",
+                "A permissive CORS policy and a JWT/session token were both observed on this target.",
+                "1. Host a page on an attacker-controlled origin that fetch()es the token-bearing "
+                "endpoint with credentials:'include'\n"
+                "2. Because Access-Control-Allow-Origin/-Credentials is permissive, the response "
+                "(and the token in it) is readable cross-origin\n"
+                "3. Use the stolen token to impersonate the victim session"))
+
+        self.chains = chains
+        return chains
+
+    @staticmethod
+    def _chain(name, severity, owasp, mitre, why, steps):
+        labels = []
+        for code in owasp.split(","):
+            code = code.strip()
+            if code:
+                labels.append(OWASP.get(code) or OWASP_API.get(code) or code)
+        return {"name": name, "severity": severity, "owasp": " · ".join(labels),
+                "mitre": mitre_lookup(mitre), "why": why, "steps": steps}
+
     @staticmethod
     def _sug(finding, severity, location, tool, command, owasp="", mitre=""):
         labels = []
@@ -757,6 +957,8 @@ class App:
         self._build_hosts_tab()
         self._build_endpoints_tab()
         self._build_suggestions_tab()
+        self._build_chains_tab()
+        self._build_advanced_tab()
         self._build_mitre_tab()
         self._build_findings_tab()
         self._build_about_tab()
@@ -923,6 +1125,68 @@ class App:
         ttk.Button(bottom, text="Export ATT&CK Navigator layer...",
                    command=self.export_navigator_layer).pack(side="right", padx=4)
 
+    def _build_chains_tab(self):
+        f = ttk.Frame(self.nb)
+        self.nb.add(f, text="Attack Chains")
+        ttk.Label(f, text="Findings that combine into a higher-impact story - reasoning only; "
+                           "nothing here executes anything. Select a chain for the manual steps.",
+                  wraplength=900, padding=8).pack(anchor="w")
+
+        cols = ("severity", "owasp", "mitre", "name")
+        self.chain_tree = ttk.Treeview(f, columns=cols, show="headings", height=8)
+        widths = {"severity": 55, "owasp": 230, "mitre": 230, "name": 420}
+        headings = {"owasp": "OWASP Top 10", "mitre": "MITRE ATT&CK"}
+        for c in cols:
+            self.chain_tree.heading(c, text=headings.get(c, c.capitalize()))
+            self.chain_tree.column(c, width=widths[c], anchor="w")
+        self.chain_tree.pack(fill="both", expand=False, padx=8)
+        self.chain_tree.bind("<<TreeviewSelect>>", self._on_chain_select)
+        for sev, color in (("P1", "#fbe1e1"), ("P2", "#fbe7d6")):
+            self.chain_tree.tag_configure(sev, background=color)
+
+        self.chain_detail = tk.Text(f, wrap="word", height=10, padx=8, pady=8)
+        self.chain_detail.pack(fill="both", expand=True, padx=8, pady=8)
+        self.chain_detail.config(state="disabled")
+
+    def _build_advanced_tab(self):
+        f = ttk.Frame(self.nb, padding=12)
+        self.nb.add(f, text="Advanced Tools")
+
+        cors_box = ttk.LabelFrame(f, text="CORS exploit PoC generator", padding=10)
+        cors_box.pack(fill="x", pady=(0, 12))
+        ttk.Label(cors_box, text="Writes a standalone HTML page that demonstrates a permissive CORS "
+                                  "policy stealing cross-origin data - report evidence, not an attack "
+                                  "this app performs itself.", wraplength=820).pack(anchor="w", pady=(0, 6))
+        row = ttk.Frame(cors_box)
+        row.pack(fill="x")
+        ttk.Label(row, text="Target URL:").pack(side="left")
+        self.cors_poc_url = tk.StringVar()
+        ttk.Entry(row, textvariable=self.cors_poc_url, width=70).pack(side="left", padx=6, fill="x", expand=True)
+        ttk.Button(row, text="Generate PoC...", command=self.generate_cors_poc).pack(side="left")
+
+        race_box = ttk.LabelFrame(f, text="Race-condition tester", padding=10)
+        race_box.pack(fill="x")
+        ttk.Label(race_box, text="Fires N parallel requests at ONE endpoint you specify, to check if a "
+                                  "limited-use action (coupon, vote, withdrawal) can be triggered more "
+                                  "than once. This can cause real duplicate side effects on a live "
+                                  "target - use only on an endpoint you specifically intend to test, "
+                                  "and only with authorization for exactly this.",
+                  wraplength=820, foreground="#a33").pack(anchor="w", pady=(0, 6))
+        row2 = ttk.Frame(race_box)
+        row2.pack(fill="x", pady=2)
+        ttk.Label(row2, text="URL:").pack(side="left")
+        self.race_url = tk.StringVar()
+        ttk.Entry(row2, textvariable=self.race_url, width=60).pack(side="left", padx=6, fill="x", expand=True)
+        ttk.Label(row2, text="Requests:").pack(side="left", padx=(8, 0))
+        self.race_n = tk.StringVar(value="5")
+        ttk.Entry(row2, textvariable=self.race_n, width=4).pack(side="left", padx=4)
+        row3 = ttk.Frame(race_box)
+        row3.pack(fill="x", pady=2)
+        ttk.Label(row3, text="Type the target hostname to confirm:").pack(side="left")
+        self.race_confirm = tk.StringVar()
+        ttk.Entry(row3, textvariable=self.race_confirm, width=30).pack(side="left", padx=6)
+        ttk.Button(row3, text="Fire", command=self.run_race_test).pack(side="left", padx=6)
+
     def _build_mitre_tab(self):
         f = ttk.Frame(self.nb)
         self.nb.add(f, text="MITRE Reference")
@@ -1060,7 +1324,11 @@ class App:
                     return
                 self.recon.test_params()
                 self.recon.build_suggestions()
+                self.recon.build_attack_chains()
                 self.q.put(("suggestions", None))
+                if self.recon.chains:
+                    self.log("[!] {} attack chain(s) identified - see the Attack Chains tab.".format(
+                        len(self.recon.chains)))
                 self.log("[*] Recon complete.")
             except Exception as e:
                 self.log("[!] Recon crashed: {}".format(e))
@@ -1090,6 +1358,7 @@ class App:
                     self._refresh_endpoints()
                 elif kind == "suggestions":
                     self._refresh_suggestions()
+                    self._refresh_chains()
                 elif kind == "done":
                     self.start_btn.config(state="normal")
                     self.stop_btn.config(state="disabled")
@@ -1129,6 +1398,31 @@ class App:
         self.sug_tree.tag_configure("P3", background="#faf1cf", foreground="#7a5f08")
         self.sug_tree.tag_configure("P4", background="#dfe9f9", foreground="#1d4ed8")
         self.sug_tree.tag_configure("P5", background="#eef1f2", foreground="#475569")
+
+    def _refresh_chains(self):
+        self.chain_tree.delete(*self.chain_tree.get_children())
+        chains = self.recon.chains if self.recon else []
+        for c in chains:
+            self.chain_tree.insert("", "end", values=(c["severity"], c["owasp"], c["mitre"], c["name"]),
+                                    tags=(c["severity"],))
+        self.chain_detail.config(state="normal")
+        self.chain_detail.delete("1.0", "end")
+        if not chains:
+            self.chain_detail.insert("1.0", "No multi-finding attack chains identified from this "
+                                              "recon run yet - select a target's individual findings "
+                                              "in Attack Suggestions instead.")
+        self.chain_detail.config(state="disabled")
+
+    def _on_chain_select(self, event):
+        sel = self.chain_tree.selection()
+        if not sel or not self.recon:
+            return
+        idx = self.chain_tree.index(sel[0])
+        c = self.recon.chains[idx]
+        self.chain_detail.config(state="normal")
+        self.chain_detail.delete("1.0", "end")
+        self.chain_detail.insert("1.0", "Why: {}\n\nManual steps:\n{}".format(c["why"], c["steps"]))
+        self.chain_detail.config(state="disabled")
 
     def _on_suggestion_select(self, event):
         sel = self.sug_tree.selection()
@@ -1212,6 +1506,88 @@ class App:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(layer, fh, indent=2)
         self.status_var.set("Navigator layer exported to {} - import it at mitre-attack.github.io/attack-navigator".format(path))
+
+    def generate_cors_poc(self):
+        url = self.cors_poc_url.get().strip()
+        if not url and self.recon and self.recon.cors_hosts:
+            url = self.recon.cors_hosts[0]["url"]
+            self.cors_poc_url.set(url)
+        if not url:
+            messagebox.showwarning(APP_NAME, "Enter the target URL with the permissive CORS policy first.")
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".html",
+                                             filetypes=[("HTML PoC", "*.html")],
+                                             initialfile="cors-poc.html")
+        if not path:
+            return
+        page = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>CORS misconfiguration PoC - Bug Hunt HQ</title></head>
+<body>
+<h2>CORS misconfiguration proof of concept</h2>
+<p>Target: <code>{url_display}</code></p>
+<p>Host this page on any OTHER origin (not the target) and open it while logged into the target in
+the same browser. If the response below shows target data, the target's CORS policy lets this
+foreign origin read authenticated responses cross-origin - report this page as the PoC.</p>
+<pre id="out" style="background:#111;color:#eee;padding:12px;white-space:pre-wrap;">Fetching...</pre>
+<script>
+fetch({url_json}, {{credentials: "include"}})
+  .then(r => r.text())
+  .then(t => document.getElementById("out").textContent = t)
+  .catch(e => document.getElementById("out").textContent = "Fetch failed: " + e);
+</script>
+</body></html>
+""".format(url_display=html.escape(url), url_json=json.dumps(url))
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(page)
+        self.status_var.set("CORS PoC written to {} - host it on a different origin to demonstrate impact.".format(path))
+
+    def run_race_test(self):
+        url = self.race_url.get().strip()
+        if not url:
+            messagebox.showwarning(APP_NAME, "Enter a target URL first.")
+            return
+        if not self.authorized_var.get():
+            messagebox.showwarning(APP_NAME, "Check the authorization box at the top before running this.")
+            return
+        host = urlparse(url).hostname or ""
+        if self.race_confirm.get().strip().lower() != host.lower():
+            messagebox.showwarning(APP_NAME, "Type the exact hostname ({}) to confirm you mean to fire "
+                                              "parallel requests at this specific endpoint - this can "
+                                              "cause real duplicate side effects.".format(host))
+            return
+        try:
+            n = max(2, min(20, int(self.race_n.get().strip())))
+        except ValueError:
+            messagebox.showerror(APP_NAME, "Requests must be a number (2-20).")
+            return
+
+        self.nb.select(self.tab_log)
+        self.log("[*] Race-condition test: firing {} parallel requests at {}".format(n, url))
+
+        def fire(_):
+            try:
+                r = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
+                return r.status_code
+            except Exception as e:
+                return "error: {}".format(e)
+
+        def worker():
+            with ThreadPoolExecutor(max_workers=n) as ex:
+                results = list(ex.map(fire, range(n)))
+            summary = {}
+            for r in results:
+                summary[r] = summary.get(r, 0) + 1
+            self.log("[*] Race test results: " + ", ".join(
+                "{}x {}".format(v, k) for k, v in summary.items()))
+            succeeded = sum(v for k, v in summary.items() if isinstance(k, int) and 200 <= k < 300)
+            if succeeded > 1:
+                self.log("[!] {} of {} requests succeeded (2xx) - possible race condition letting the "
+                          "limited-use action fire more than once.".format(succeeded, n))
+            else:
+                self.log("[*] Only {} request(s) succeeded - no race condition evident from this test.".format(
+                    succeeded))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _run_cmd(self):
         cmd = self.cmd_var.get().strip()
@@ -1323,6 +1699,7 @@ class App:
                 "subdomains": self.recon.subdomains if self.recon else [],
                 "params": {k: sorted(v) for k, v in (self.recon.params.items() if self.recon else {})},
                 "suggestions": self.recon.suggestions if self.recon else [],
+                "chains": self.recon.chains if self.recon else [],
             } if self.recon else None,
         }
         with open(path, "w", encoding="utf-8") as fh:
@@ -1354,6 +1731,10 @@ class App:
             for s in recon_data.get("suggestions", []):
                 self.sug_tree.insert("", "end", values=(s["severity"], s.get("owasp", ""), s.get("mitre", ""),
                                                           s["finding"], s["location"], s["tool"]))
+            self.chain_tree.delete(*self.chain_tree.get_children())
+            for c in recon_data.get("chains", []):
+                self.chain_tree.insert("", "end", values=(c["severity"], c["owasp"], c["mitre"], c["name"]),
+                                        tags=(c["severity"],))
         self.project_file = path
         self.status_var.set("Project loaded from {}".format(path))
 
