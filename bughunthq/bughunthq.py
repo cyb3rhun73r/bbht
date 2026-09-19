@@ -164,6 +164,18 @@ def bundled_tools_dir():
     return os.path.join(base, "tools")
 
 
+def child_env():
+    """Environment for any subprocess this app spawns. Forces UTF-8 I/O so a
+    vendored tool that prints Unicode (banners, box-drawing, non-ASCII
+    findings) doesn't crash on Windows, where a piped child process would
+    otherwise fall back to the system codepage (cp1252 etc) and raise
+    UnicodeEncodeError the moment it prints something outside that codepage."""
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
 def find_tool_path(tool_name):
     """Look for a bundled compiled binary first, then fall back to PATH."""
     exe_name = tool_name + (".exe" if os.name == "nt" else "")
@@ -339,7 +351,8 @@ class Recon:
                     cmd = [path, "-d", self.domain, "-silent"]
                 else:
                     cmd = [path, "enum", "-passive", "-d", self.domain]
-                out = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+                out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                                      errors="replace", env=child_env(), timeout=90)
                 for line in out.stdout.splitlines():
                     line = line.strip().lower()
                     if line.endswith(self.domain):
@@ -833,7 +846,8 @@ class App:
         def worker():
             try:
                 proc = subprocess.Popen(argv, cwd=bundled_tools_dir(), stdout=subprocess.PIPE,
-                                         stderr=subprocess.STDOUT, text=True, bufsize=1)
+                                         stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                         errors="replace", env=child_env(), bufsize=1)
                 for line in proc.stdout:
                     self.log(line.rstrip("\n"))
                 proc.wait()
@@ -1209,7 +1223,8 @@ class App:
 
         def worker():
             try:
-                proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
+                proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                                       errors="replace", env=child_env(), timeout=600)
                 self.log(proc.stdout[-4000:])
                 if proc.stderr:
                     self.log("[stderr] " + proc.stderr[-2000:])
