@@ -1112,8 +1112,15 @@ class App:
             self.sug_tree.insert("", "end", values=(s["severity"], s["owasp"], s["mitre"],
                                                       s["finding"], s["location"], s["tool"]),
                                   tags=(s["severity"],))
-        self.sug_tree.tag_configure("P1", background="#3a1d1c")
-        self.sug_tree.tag_configure("P2", background="#3a2a18")
+        # Light, theme-appropriate tints (this app defaults to a light ttk
+        # theme on Windows) with a matching dark foreground for readability -
+        # not the near-black maroon/olive this used to hardcode, which read
+        # as broken against the rest of the light UI.
+        self.sug_tree.tag_configure("P1", background="#fbe1e1", foreground="#8a1414")
+        self.sug_tree.tag_configure("P2", background="#fbe7d6", foreground="#8a4b12")
+        self.sug_tree.tag_configure("P3", background="#faf1cf", foreground="#7a5f08")
+        self.sug_tree.tag_configure("P4", background="#dfe9f9", foreground="#1d4ed8")
+        self.sug_tree.tag_configure("P5", background="#eef1f2", foreground="#475569")
 
     def _on_suggestion_select(self, event):
         sel = self.sug_tree.selection()
