@@ -759,6 +759,7 @@ class App:
     def _build_setup_tab(self):
         f = ttk.Frame(self.nb, padding=12)
         self.nb.add(f, text="Setup")
+        self.tab_setup = f
 
         ttk.Label(f, text="Prerequisites", font=("", 11, "bold")).pack(anchor="w")
         ttk.Label(f, text="Everything below downloads/configures itself into the tools\\ "
@@ -823,7 +824,7 @@ class App:
                 "(a few hundred MB) and the MITRE ATT&CK dataset (~50MB) into tools\\ "
                 "next to this app - one-time, safe to re-run later from the Setup tab.\n\n"
                 "Requires an internet connection."):
-            self.nb.select(0)  # Setup tab
+            self.nb.select(self.tab_setup)
             self.run_setup_script("fetch_tools.py")
             self.run_setup_script("fetch_attack_data.py")
 
@@ -840,7 +841,7 @@ class App:
         else:
             argv = [sys.executable, script_path]
 
-        self.nb.select(1)  # Recon Log tab
+        self.nb.select(self.tab_log)
         self.log("[*] Running {} ...".format(script_name))
 
         def worker():
@@ -861,6 +862,7 @@ class App:
     def _build_log_tab(self):
         f = ttk.Frame(self.nb)
         self.nb.add(f, text="Recon Log")
+        self.tab_log = f
         self.log_text = tk.Text(f, wrap="word", state="disabled", bg="#0d1417", fg="#d7e3e6",
                                  insertbackground="#d7e3e6", font=("Consolas", 10))
         self.log_text.pack(fill="both", expand=True, side="left")
@@ -945,6 +947,7 @@ class App:
     def _build_findings_tab(self):
         f = ttk.Frame(self.nb)
         self.nb.add(f, text="Findings Log")
+        self.tab_findings = f
 
         form = ttk.LabelFrame(f, text="New finding", padding=8)
         form.pack(fill="x", padx=4, pady=4)
@@ -1239,7 +1242,7 @@ class App:
                 self.log("[!] Tool run failed: {}".format(e))
 
         threading.Thread(target=worker, daemon=True).start()
-        self.nb.select(0)
+        self.nb.select(self.tab_log)
 
     def _suggestion_to_finding(self):
         sel = self.sug_tree.selection()
@@ -1250,7 +1253,7 @@ class App:
         self.f_title.set(s["finding"])
         self.f_sev.set(s["severity"])
         self.f_target.set(s["location"])
-        self.nb.select(4)
+        self.nb.select(self.tab_findings)
 
     # ---------------- findings ----------------
 
