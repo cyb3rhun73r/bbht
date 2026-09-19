@@ -209,6 +209,36 @@ def package_name(requirement_line):
     return m.group(0) if m else None
 
 
+def import_names_for(pip_name):
+    """PyInstaller's --collect-all needs the actual importable top-level
+    module name, which often differs from the PyPI distribution name
+    (PySocks -> socks, beautifulsoup4 -> bs4, pycryptodomex -> Cryptodome,
+    requests-pkcs12 -> requests_pkcs12). Resolve it from the package's own
+    installed metadata instead of guessing."""
+    try:
+        import importlib.metadata as im
+    except ImportError:
+        return [pip_name]
+    target = pip_name.lower().replace("_", "-")
+    try:
+        mapping = im.packages_distributions()
+        found = [imp for imp, dists in mapping.items()
+                 if any(d.lower().replace("_", "-") == target for d in dists)]
+        if found:
+            return found
+    except Exception:
+        pass
+    try:
+        top_level = im.distribution(pip_name).read_text("top_level.txt")
+        if top_level:
+            names = [n.strip() for n in top_level.splitlines() if n.strip()]
+            if names:
+                return names
+    except Exception:
+        pass
+    return [pip_name]  # best-effort fallback - matches the old behavior
+
+
 def install_tool_requirements(name, tool_dir, all_packages):
     req_path = os.path.join(tool_dir, "requirements.txt")
     if not os.path.isfile(req_path):
@@ -216,9 +246,9 @@ def install_tool_requirements(name, tool_dir, all_packages):
     with open(req_path, "r", encoding="utf-8", errors="ignore") as fh:
         lines = [l.strip() for l in fh if l.strip() and not l.strip().startswith("#")]
     pkgs = [package_name(l) for l in lines]
-    all_packages.update(p for p in pkgs if p)
 
     if not pip_is_usable():
+        all_packages.update(p for p in pkgs if p)
         print("    [!] {} declares dependencies ({}) but pip isn't available in this "
               "environment - run fetch_tools.py from a normal `python` install (inside "
               "build.bat's venv) so they get installed and frozen into the exe.".format(
@@ -235,8 +265,11 @@ def install_tool_requirements(name, tool_dir, all_packages):
         try:
             subprocess.run([sys.executable, "-m", "pip", "install", "-q", pkg],
                             check=True, timeout=180)
-            print("        [+] {}".format(pkg))
+            imports = import_names_for(pkg)
+            all_packages.update(imports)
+            print("        [+] {} (import: {})".format(pkg, ", ".join(imports)))
         except Exception as e:
+            all_packages.add(pkg)  # still record something rather than nothing
             print("        [!] {} failed to install ({}) - the tool may not run until "
                   "this is resolved (try `pip install {}` by hand).".format(pkg, e, pkg))
 
