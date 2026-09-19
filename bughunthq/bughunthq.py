@@ -9,6 +9,7 @@ explicit written permission to test.
 Build into a Windows .exe with PyInstaller (see build.bat / README.md).
 """
 
+import html
 import json
 import os
 import queue
@@ -119,7 +120,7 @@ SECURITY_HEADERS = [
 TOOL_HINTS = {
     # A03 Injection
     "sqlmap": "sqlmap -u \"{url}\" --batch --level=2 --risk=1",
-    "dalfox": "dalfox url \"{url}\"",
+    "dalfox": "dalfox scan \"{url}\"",
     "commix": "commix --url \"{url}\" --batch",
     # A01 Broken Access Control
     "ffuf-lfi": "ffuf -u \"{url_marker}\" -w wordlists/lfi.txt -mc all",
@@ -460,7 +461,11 @@ class Recon:
             self.crawled_urls.add(url)
             self._record_params(url)
             for m in re.finditer(r'''(?:href|src|action)\s*=\s*["']([^"'#\s]+)''', r.text, re.I):
-                link = urljoin(url, m.group(1))
+                # HTML attribute values legitimately encode & as &amp; (and
+                # other entities); without unescaping, extracted URLs like
+                # "...?a=1&amp;b=2" break every downstream tool that gets
+                # handed the literal string instead of a real query string.
+                link = urljoin(url, html.unescape(m.group(1)))
                 p = urlparse(link)
                 if p.netloc != domain_root:
                     continue
