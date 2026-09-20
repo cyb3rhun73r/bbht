@@ -34,6 +34,7 @@ RUN gem install wpscan --no-document
 WORKDIR /app
 COPY bughunthq/requirements.txt bughunthq/requirements.txt
 COPY bughunthq/web/requirements.txt bughunthq/web/requirements.txt
+COPY bugbounty-intel/pyproject.toml bugbounty-intel/pyproject.toml
 RUN pip install --no-cache-dir -r bughunthq/requirements.txt -r bughunthq/web/requirements.txt
 
 COPY . .
@@ -42,6 +43,14 @@ COPY . .
 # sqlmap, git-dumper, commix, jwt_tool, corsy) at build time so the image is
 # self-contained - no network fetch needed at runtime just to get tools.
 RUN python bughunthq/tools/fetch_tools.py || true
+
+# Install bugbounty-intel and pre-load its curated payload-intelligence
+# dataset at build time, so Bug Hunt HQ can look up matching payloads for
+# each suggestion (see bughunthq/web/app.py: _intel_lookup) with no extra
+# runtime setup.
+ENV BBINTEL_DB=/app/bugbounty-intel-data/data.sqlite3
+RUN pip install --no-cache-dir -e ./bugbounty-intel \
+    && bugbounty-intel sync
 
 EXPOSE 8000
 

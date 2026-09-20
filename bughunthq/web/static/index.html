@@ -87,6 +87,12 @@
   </div>
 
   <div class="panel">
+    <h3>Payload Intel</h3>
+    <p style="color:#8b93a7;font-size:12px;margin-top:-4px;">From bugbounty-intel (SAFE/LOW-risk payloads only, with source provenance)</p>
+    <div id="intel"></div>
+  </div>
+
+  <div class="panel">
     <h3>Attack chains</h3>
     <div id="chains"></div>
   </div>
@@ -190,6 +196,12 @@ function renderResults(job) {
       vbtn.onclick = () => validateSuggestion(idx, vbtn);
       actions.appendChild(vbtn);
     }
+    const ibtn = document.createElement('button');
+    ibtn.textContent = 'Intel';
+    ibtn.className = 'secondary';
+    ibtn.style.marginLeft = '6px';
+    ibtn.onclick = () => loadIntel(idx, s.finding);
+    actions.appendChild(ibtn);
     tbody.appendChild(tr);
   });
 
@@ -204,6 +216,34 @@ function renderResults(job) {
       <pre>${esc(c.steps)}</pre>`;
     chainsEl.appendChild(div);
   });
+}
+
+async function loadIntel(idx, findingText) {
+  const intelEl = document.getElementById('intel');
+  intelEl.innerHTML = `<p>Looking up payload intelligence for "${esc(findingText)}"...</p>`;
+  intelEl.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+  const resp = await fetch(`/api/jobs/${currentJob}/suggestions/${idx}/intel`);
+  const data = await resp.json();
+
+  if (!data.category) {
+    intelEl.innerHTML = `<p style="color:#8b93a7;">No bugbounty-intel category mapped for this finding type yet.</p>`;
+    return;
+  }
+  if (!data.payloads.length) {
+    intelEl.innerHTML = `<p style="color:#8b93a7;">No SAFE/LOW-risk payloads found for category "${esc(data.category)}" - has bugbounty-intel been synced? (<code>bugbounty-intel sync</code>)</p>`;
+    return;
+  }
+  intelEl.innerHTML = data.payloads.map(p => `
+    <div class="panel" style="margin-bottom:10px;">
+      <div><span class="badge badge-NOT_REPRODUCIBLE">${esc(p.risk_level)}</span> <code>${esc(p.payload)}</code></div>
+      <div style="margin-top:6px;font-size:12px;color:#8b93a7;">
+        Purpose: ${esc(p.purpose)} &middot; Expect: ${esc(p.expected_indicator || '-')}<br>
+        OWASP: ${esc(p.owasp || '-')} &middot; CWE: ${esc(p.cwe || '-')}<br>
+        Source: ${esc(p.source_id || '-')} ${p.source_url ? `- <a href="${esc(p.source_url)}" target="_blank" style="color:#3b6ef6;">${esc(p.source_url)}</a>` : ''}
+      </div>
+    </div>
+  `).join('');
 }
 
 async function runTool(command) {

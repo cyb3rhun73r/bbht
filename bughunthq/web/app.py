@@ -14,6 +14,7 @@ permission to test.
 import os
 import re
 import shlex
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -37,6 +38,65 @@ from bughunthq.bughunthq import (
 
 # Ordered scan phases, used to drive the live progress indicator in the UI.
 PHASES = ["subdomains", "crawl", "params", "suggestions", "done"]
+
+# bugbounty-intel's payload database (see bugbounty-intel/README.md). Read
+# directly as plain SQLite rather than importing that project's package, so
+# the two tools stay decoupled - this app degrades gracefully (empty
+# results) if the database isn't present or bugbounty-intel was never synced.
+INTEL_DB_PATH = os.environ.get(
+    "BBINTEL_DB", str(Path.home() / ".bugbounty-intel" / "data.sqlite3")
+)
+
+# Maps a substring of a Recon suggestion's "finding" text to the matching
+# bugbounty-intel payload category. Checked in order - first match wins.
+FINDING_TO_INTEL_CATEGORY = [
+    ("sqli candidate", "sqli"),
+    ("reflected parameter", "xss"),
+    ("os command-injection", "command-injection"),
+    ("lfi/path-traversal", "path-traversal"),
+    ("ssrf candidate", "ssrf"),
+    ("ssti confirmed", "ssti"),
+    ("crlf", "crlf"),
+    ("open redirect", "open-redirect"),
+    ("permissive cors", "cors"),
+    ("graphql", "graphql"),
+    ("mass-assignment", "hpp"),
+]
+
+
+def _intel_category_for_finding(finding_text):
+    lowered = finding_text.lower()
+    for substr, category in FINDING_TO_INTEL_CATEGORY:
+        if substr in lowered:
+            return category
+    return None
+
+
+def intel_lookup(category, limit=8):
+    """Returns up to `limit` SAFE/LOW-risk payloads for a bugbounty-intel
+    category, each with its source provenance. Never returns MEDIUM/HIGH/
+    RESTRICTED payloads here - this is a suggestion surface, not an
+    execution path (see bugbounty-intel/docs/safety.md)."""
+    if not os.path.isfile(INTEL_DB_PATH):
+        return []
+    try:
+        conn = sqlite3.connect(INTEL_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT p.payload, p.purpose, p.risk_level, p.expected_indicator,
+                      p.owasp, p.cwe, v.source_id, v.source_url
+               FROM payloads p
+               LEFT JOIN payload_variants v ON v.payload_id = p.id
+               WHERE p.category = ? AND p.risk_level IN ('SAFE', 'LOW')
+               GROUP BY p.id
+               ORDER BY p.risk_level, p.payload
+               LIMIT ?""",
+            (category, limit),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except sqlite3.Error:
+        return []
 
 app = FastAPI(title="Bug Hunt HQ")
 
@@ -364,6 +424,19 @@ def validate_suggestion_endpoint(job_id: str, index: int, body: ValidateRequest)
     if recon is None or index < 0 or index >= len(recon.suggestions):
         raise HTTPException(status_code=404, detail="unknown suggestion index")
     return _validate_suggestion(recon, recon.suggestions[index])
+
+
+@app.get("/api/jobs/{job_id}/suggestions/{index}/intel")
+def suggestion_intel_endpoint(job_id: str, index: int):
+    job = _job_or_404(job_id)
+    recon = job.get("recon")
+    if recon is None or index < 0 or index >= len(recon.suggestions):
+        raise HTTPException(status_code=404, detail="unknown suggestion index")
+    sug = recon.suggestions[index]
+    category = _intel_category_for_finding(sug["finding"])
+    if category is None:
+        return {"category": None, "payloads": []}
+    return {"category": category, "payloads": intel_lookup(category)}
 
 
 @app.get("/")
