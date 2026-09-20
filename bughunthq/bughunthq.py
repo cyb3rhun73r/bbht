@@ -147,6 +147,10 @@ TOOL_HINTS = {
     "arjun": "arjun -u \"{url}\" -oT arjun-results.txt",
     "graphql-batching-check": "curl -s -X POST \"{url}\" -H \"Content-Type: application/json\" "
                                "-d \"[{{\\\"query\\\":\\\"{{__typename}}\\\"}},{{\\\"query\\\":\\\"{{__typename}}\\\"}}]\"",
+    # Throttled + WAF-evasion variant, suggested alongside the plain dalfox
+    # command whenever the target host fingerprints as Cloudflare-fronted -
+    # a default-speed, unencoded scan just gets pattern-matched/blocked.
+    "dalfox-waf-evasion": "dalfox url \"{url}\" --skip-bav --waf-evasion --delay 500",
 }
 
 # Pure-Python tools vendored as source (no separate runtime needed) rather
@@ -566,6 +570,13 @@ class Recon:
         new_query = "&".join("{}={}".format(k, v[0]) for k, v in qs.items())
         return parts._replace(query=new_query).geturl()
 
+    def _host_is_cloudflare(self, url):
+        """True if the URL's host was fingerprinted as Cloudflare-fronted
+        during subdomain probing (see _fingerprint's 'cloudflare' check)."""
+        host = urlparse(url).netloc
+        return any(rec["host"] == host and "cloudflare" in rec.get("tech", [])
+                   for rec in self.subdomains)
+
     def test_params(self):
         all_urls = set(self.params.keys())
         if not all_urls:
@@ -713,6 +724,11 @@ class Recon:
         for ref in self.reflections:
             s.append(self._sug("Reflected parameter (possible XSS)", "P2", ref["url"],
                                 "dalfox", TOOL_HINTS["dalfox"].format(url=ref["url"]), "A03", "T1059"))
+            if self._host_is_cloudflare(ref["url"]):
+                s.append(self._sug(
+                    "Reflected parameter behind Cloudflare - default-speed scan likely blocked/challenged",
+                    "P2", ref["url"], "dalfox (WAF-evasion)",
+                    TOOL_HINTS["dalfox-waf-evasion"].format(url=ref["url"]), "A03", "T1059"))
 
         for red in self.open_redirects:
             s.append(self._sug("Open redirect", "P3", "{} (param: {})".format(red["url"], red["param"]),
