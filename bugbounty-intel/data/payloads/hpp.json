@@ -1,0 +1,48 @@
+[
+  {
+    "category": "hpp",
+    "subcategory": "duplicate-param",
+    "payload": "id=1&id=2",
+    "context": "query-string",
+    "purpose": "logic-test",
+    "detection_method": "response_diff",
+    "expected_indicator": "compare which value the frontend (e.g. a WAF/validation layer) sees vs. which the backend actually processes - frameworks disagree on first-vs-last-wins",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-235"],
+    "source_id": "payloadsallthethings",
+    "source_url": "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/HTTP%20Parameter%20Pollution"
+  },
+  {
+    "category": "hpp",
+    "subcategory": "duplicate-param",
+    "payload": "role=user&role=admin",
+    "context": "form-body",
+    "purpose": "authorization-test",
+    "detection_method": "response_diff",
+    "expected_indicator": "a validation layer checks the first 'role=user' while the backend model-binds the last 'role=admin' (or vice versa)",
+    "risk_level": "LOW",
+    "safe_for_automation": false,
+    "requires_manual_validation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-235"],
+    "source_id": "payloadsallthethings",
+    "source_url": "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/HTTP%20Parameter%20Pollution"
+  },
+  {
+    "category": "hpp",
+    "subcategory": "duplicate-param",
+    "payload": "redirect=/safe&redirect=https://controlled-test-domain.example",
+    "context": "query-string",
+    "purpose": "filter-test",
+    "detection_method": "location_header_check",
+    "expected_indicator": "an allow-list check validates the first value while the redirect logic uses the last",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-235", "CWE-601"],
+    "source_id": "payloadsallthethings",
+    "source_url": "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/HTTP%20Parameter%20Pollution"
+  }
+]

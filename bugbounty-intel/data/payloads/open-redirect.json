@@ -1,0 +1,62 @@
+[
+  {
+    "category": "open-redirect",
+    "subcategory": "absolute",
+    "payload": "https://controlled-test-domain.example",
+    "context": "redirect-parameter",
+    "purpose": "detection",
+    "detection_method": "location_header_check",
+    "expected_indicator": "Location header (or client-side redirect) points at the tester-controlled domain",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-601"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet"
+  },
+  {
+    "category": "open-redirect",
+    "subcategory": "protocol-relative",
+    "payload": "//controlled-test-domain.example",
+    "context": "redirect-parameter",
+    "purpose": "filter-test",
+    "detection_method": "location_header_check",
+    "expected_indicator": "protocol-relative form bypasses filters that only block 'http(s)://' prefixes",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-601"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet"
+  },
+  {
+    "category": "open-redirect",
+    "subcategory": "encoded",
+    "payload": "https:%2f%2fcontrolled-test-domain.example",
+    "context": "redirect-parameter",
+    "purpose": "encoding-test",
+    "detection_method": "location_header_check",
+    "expected_indicator": "URL-encoded slashes bypass naive substring filters on '//'",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-601"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet"
+  },
+  {
+    "category": "open-redirect",
+    "subcategory": "backslash-confusion",
+    "payload": "https:/\\controlled-test-domain.example",
+    "context": "redirect-parameter",
+    "purpose": "parser-confusion",
+    "detection_method": "location_header_check",
+    "expected_indicator": "browsers normalize backslashes to forward slashes; some server-side validators don't",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A01"],
+    "cwe": ["CWE-601"],
+    "source_id": "payloadsallthethings",
+    "source_url": "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Open%20Redirect"
+  }
+]

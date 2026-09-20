@@ -1,0 +1,12 @@
+services:
+  bugbounty-intel:
+    build: .
+    image: bugbounty-intel
+    volumes:
+      - bugbounty-intel-data:/root/.bugbounty-intel
+    environment:
+      - HACKERONE_API_USERNAME=${HACKERONE_API_USERNAME:-}
+      - HACKERONE_API_TOKEN=${HACKERONE_API_TOKEN:-}
+
+volumes:
+  bugbounty-intel-data:

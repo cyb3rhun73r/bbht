@@ -1,0 +1,51 @@
+[
+  {
+    "category": "prototype-pollution",
+    "subcategory": "proto-key",
+    "payload": "{\"__proto__\": {\"bbtest\": \"1\"}}",
+    "context": "json-body",
+    "technology": ["Node.js", "Express"],
+    "purpose": "detection",
+    "detection_method": "marker_property_check",
+    "expected_indicator": "a subsequent unrelated request/object exhibits the injected 'bbtest' property, confirming global prototype pollution rather than an isolated RCE attempt",
+    "risk_level": "LOW",
+    "safe_for_automation": true,
+    "requires_manual_validation": true,
+    "owasp": ["A08"],
+    "cwe": ["CWE-1321"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/prototype-pollution"
+  },
+  {
+    "category": "prototype-pollution",
+    "subcategory": "constructor-key",
+    "payload": "{\"constructor\": {\"prototype\": {\"bbtest\": \"1\"}}}",
+    "context": "json-body",
+    "technology": ["Node.js", "Express"],
+    "purpose": "detection",
+    "detection_method": "marker_property_check",
+    "expected_indicator": "same as __proto__ variant, used when '__proto__' itself is filtered/blocked",
+    "risk_level": "LOW",
+    "safe_for_automation": true,
+    "owasp": ["A08"],
+    "cwe": ["CWE-1321"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/prototype-pollution"
+  },
+  {
+    "category": "prototype-pollution",
+    "subcategory": "client-side-query-string",
+    "payload": "?__proto__[bbtest]=1",
+    "context": "url-query",
+    "technology": ["client-side frameworks that parse query strings into objects"],
+    "purpose": "detection",
+    "detection_method": "marker_property_check",
+    "expected_indicator": "check window.bbtest or an object's inherited property in the browser console after loading the URL",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A08"],
+    "cwe": ["CWE-1321"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/prototype-pollution/client-side"
+  }
+]

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bugbounty-intel"
+version = "0.1.0"
+description = "Local, searchable bug-bounty research and payload-intelligence tool for authorized security testing."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.1",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+bugbounty-intel = "src.cli.main:main"
+
+[tool.setuptools]
+packages = [
+    "src",
+    "src.cli",
+    "src.collectors",
+    "src.normalizers",
+    "src.classifiers",
+    "src.dedup",
+    "src.database",
+    "src.search",
+    "src.exporters",
+    "src.safety",
+    "src.reporting",
+]
+
+[tool.setuptools.package-data]
+src = ["database/schema.sql"]

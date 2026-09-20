@@ -1,0 +1,17 @@
+# bugbounty-intel default configuration.
+# Secrets (HackerOne API credentials) are read from environment variables,
+# never stored here - see docs/sources.md.
+
+oast:
+  enabled: false
+  provider: ""     # e.g. "interactsh" or "burp-collaborator" - set by you
+  domain: ""        # your own OAST domain/subdomain - never hardcoded by this tool
+
+request_safety:
+  default_mode: PASSIVE   # PASSIVE | SAFE_ACTIVE | MANUAL - see docs/safety.md
+  timeout_seconds: 15
+
+sync:
+  hackerone:
+    page_size: 25
+    max_retries: 5

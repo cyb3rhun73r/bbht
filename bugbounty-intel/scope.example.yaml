@@ -1,0 +1,13 @@
+# Copy to scope.yaml and edit before enabling SAFE_ACTIVE mode.
+# Without a scope.yaml present, bugbounty-intel defaults to PASSIVE/OFFLINE
+# mode and will never send an active request (see §39 of the project spec).
+
+allowed_domains:
+  - example.com
+  - "*.example.com"
+
+excluded_domains:
+  - payments.example.com
+
+excluded_paths:
+  - "/admin/delete"

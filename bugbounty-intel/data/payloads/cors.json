@@ -1,0 +1,47 @@
+[
+  {
+    "category": "cors",
+    "subcategory": "reflected-origin",
+    "payload": "Origin: https://controlled-test-domain.example",
+    "context": "request-header",
+    "purpose": "detection",
+    "detection_method": "response_header_check",
+    "expected_indicator": "response echoes back 'Access-Control-Allow-Origin: https://controlled-test-domain.example' - especially dangerous combined with 'Access-Control-Allow-Credentials: true'",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A02"],
+    "cwe": ["CWE-346"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/cors"
+  },
+  {
+    "category": "cors",
+    "subcategory": "null-origin",
+    "payload": "Origin: null",
+    "context": "request-header",
+    "purpose": "filter-test",
+    "detection_method": "response_header_check",
+    "expected_indicator": "some misconfigurations trust the literal string 'null', which is trivially forgeable (sandboxed iframe, local file, data: URI)",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A02"],
+    "cwe": ["CWE-346"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/cors"
+  },
+  {
+    "category": "cors",
+    "subcategory": "subdomain-trust",
+    "payload": "Origin: https://attacker.controlled-test-domain.example",
+    "context": "request-header",
+    "purpose": "filter-test",
+    "detection_method": "response_header_check",
+    "expected_indicator": "checks whether the allow-list is a suffix/regex match that any attacker-registrable subdomain of the trusted domain would satisfy",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A02"],
+    "cwe": ["CWE-346"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/web-security/cors"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "version": "OWASP Top 10:2025 (as tracked by this tool - verify against the current official list at owasp.org before relying on it for reporting)",
+  "categories": {
+    "A01": "Broken Access Control",
+    "A02": "Security Misconfiguration",
+    "A03": "Software Supply Chain Failures",
+    "A04": "Cryptographic Failures",
+    "A05": "Injection",
+    "A06": "Insecure Design",
+    "A07": "Authentication Failures",
+    "A08": "Software or Data Integrity Failures",
+    "A09": "Security Logging and Alerting Failures",
+    "A10": "Mishandling of Exceptional Conditions"
+  }
+}

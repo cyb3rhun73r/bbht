@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.egg-info/
+*.sqlite3
+.bugbounty-intel/
+build/
+dist/
+scope.yaml

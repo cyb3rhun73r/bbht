@@ -1,0 +1,32 @@
+[
+  {
+    "category": "crlf",
+    "subcategory": "header-injection",
+    "payload": "%0d%0aX-BBTest: 1",
+    "context": "header-or-param",
+    "purpose": "detection",
+    "detection_method": "response_header_check",
+    "expected_indicator": "response includes a header 'X-BBTest: 1' that was not sent by the tester as a real header",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-113"],
+    "source_id": "portswigger",
+    "source_url": "https://portswigger.net/kb/issues/00200600_http-request-smuggling"
+  },
+  {
+    "category": "crlf",
+    "subcategory": "header-injection",
+    "payload": "%0aX-BBTest: 1",
+    "context": "header-or-param",
+    "purpose": "filter-test",
+    "detection_method": "response_header_check",
+    "expected_indicator": "bare-LF variant; some parsers normalize CRLF filtering but miss lone LF",
+    "risk_level": "SAFE",
+    "safe_for_automation": true,
+    "owasp": ["A05"],
+    "cwe": ["CWE-113"],
+    "source_id": "payloadsallthethings",
+    "source_url": "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/CRLF%20Injection"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "note": "Curated subset covering the vulnerability families this tool ships payloads for. Not the full CWE list - extend as needed from https://cwe.mitre.org/",
+  "entries": {
+    "CWE-79": "Improper Neutralization of Input During Web Page Generation (Cross-site Scripting)",
+    "CWE-89": "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)",
+    "CWE-943": "Improper Neutralization of Special Elements in Data Query Logic (NoSQL Injection)",
+    "CWE-918": "Server-Side Request Forgery (SSRF)",
+    "CWE-1336": "Improper Neutralization of Special Elements Used in a Template Engine (SSTI)",
+    "CWE-611": "Improper Restriction of XML External Entity Reference (XXE)",
+    "CWE-22": "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)",
+    "CWE-78": "Improper Neutralization of Special Elements used in an OS Command (Command Injection)",
+    "CWE-113": "Improper Neutralization of CRLF Sequences in HTTP Headers (CRLF / Header Injection)",
+    "CWE-601": "URL Redirection to Untrusted Site (Open Redirect)",
+    "CWE-346": "Origin Validation Error (CORS Misconfiguration)",
+    "CWE-1321": "Improperly Controlled Modification of Object Prototype Attributes (Prototype Pollution)",
+    "CWE-639": "Authorization Bypass Through User-Controlled Key (IDOR)",
+    "CWE-862": "Missing Authorization",
+    "CWE-863": "Incorrect Authorization",
+    "CWE-352": "Cross-Site Request Forgery (CSRF)",
+    "CWE-235": "Improper Handling of Extra Parameters (HTTP Parameter Pollution)",
+    "CWE-400": "Uncontrolled Resource Consumption (relevant to GraphQL query complexity / batching abuse)"
+  }
+}
