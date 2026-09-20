@@ -165,22 +165,32 @@ def fetch_go_tool(name, repo_spec):
         lower = asset["name"].lower()
         if lower.endswith(".zip"):
             with zipfile.ZipFile(io.BytesIO(blob)) as zf:
-                member = next((m for m in zf.namelist()
-                               if os.path.basename(m).lower() == exe_name.lower()), None)
+                # Skip directory entries (they end in '/') - a top-level
+                # folder named after the tool would otherwise match before
+                # the actual binary and zf.open() on it would fail.
+                names = [n for n in zf.namelist() if not n.endswith("/")]
+                member = next((n for n in names
+                               if os.path.basename(n).lower() == exe_name.lower()), None)
                 if not member:
-                    member = next((m for m in zf.namelist()
-                                   if os.path.basename(m).lower().startswith(name.lower())), None)
+                    member = next((n for n in names
+                                   if os.path.basename(n).lower().startswith(name.lower())), None)
                 if not member:
                     raise RuntimeError("no matching file inside archive")
                 with zf.open(member) as src, open(dest, "wb") as dst:
                     dst.write(src.read())
         elif lower.endswith((".tar.gz", ".tgz")):
             with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
+                # m.isfile() excludes directories/symlinks - a top-level
+                # folder named after the tool (e.g. "dalfox/") otherwise
+                # matches first and tf.extractfile() on it returns None,
+                # crashing the .read() below with a confusing AttributeError.
                 member = next((m for m in tf.getmembers()
-                               if os.path.basename(m.name).lower().startswith(name.lower())), None)
+                               if m.isfile() and os.path.basename(m.name).lower().startswith(name.lower())), None)
                 if not member:
                     raise RuntimeError("no matching file inside archive")
                 extracted = tf.extractfile(member)
+                if extracted is None:
+                    raise RuntimeError("matched member '{}' is not a readable file".format(member.name))
                 with open(dest, "wb") as dst:
                     dst.write(extracted.read())
         else:
