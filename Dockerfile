@@ -40,8 +40,9 @@ RUN pip install --no-cache-dir -r bughunthq/requirements.txt -r bughunthq/web/re
 COPY . .
 
 # Vendor the recon toolset (nuclei, subfinder, ffuf, dalfox, tlsx, trivy,
-# sqlmap, git-dumper, commix, jwt_tool, corsy) at build time so the image is
-# self-contained - no network fetch needed at runtime just to get tools.
+# httpx, katana, gau, amass, sqlmap, git-dumper, commix, jwt_tool, corsy,
+# arjun) at build time so the image is self-contained - no network fetch
+# needed at runtime just to get tools.
 RUN python bughunthq/tools/fetch_tools.py || true
 
 # Install bugbounty-intel and pre-load its curated payload-intelligence

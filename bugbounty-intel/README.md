@@ -36,6 +36,10 @@ bugbounty-intel payloads xss
 bugbounty-intel category A05
 bugbounty-intel cwe CWE-79
 
+# Correlate: payload -> CWE -> OWASP -> HackerOne precedent -> PortSwigger reference
+bugbounty-intel correlate ssti
+bugbounty-intel correlate xss
+
 # Export
 bugbounty-intel export --format json
 bugbounty-intel export --format csv --category sqli

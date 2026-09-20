@@ -140,6 +140,60 @@ def cwe(ctx, cwe_code):
 
 
 @cli.command()
+@click.argument("category")
+@click.pass_context
+def correlate(ctx, category):
+    """Walk Payload -> CWE -> OWASP -> related HackerOne reports -> related
+    PortSwigger reference (§47), for a payload category like 'ssti' or 'xss'."""
+    conn = _conn(ctx)
+    payload_rows = conn.execute(
+        "SELECT DISTINCT cwe, owasp FROM payloads WHERE category=? AND cwe != '' AND cwe IS NOT NULL",
+        (category,),
+    ).fetchall()
+    if not payload_rows:
+        click.echo("No payloads found for category '{}'. Run 'bugbounty-intel sync' first.".format(category))
+        conn.close()
+        return
+
+    cwe_codes = sorted({c.strip() for row in payload_rows for c in (row["cwe"] or "").split(",") if c.strip()})
+    owasp_codes = sorted({c.strip() for row in payload_rows for c in (row["owasp"] or "").split(",") if c.strip()})
+
+    click.echo("CORRELATION: {}".format(category.upper()))
+    click.echo("=" * (14 + len(category)))
+    click.echo("\nCWE: {}".format(", ".join(cwe_codes) or "-"))
+    click.echo("OWASP: {}\n".format(", ".join(owasp_codes) or "-"))
+
+    report_rows = []
+    seen_ids = set()
+    for code in cwe_codes:
+        for row in conn.execute("SELECT * FROM hacktivity_reports WHERE cwe LIKE ?", ("%{}%".format(code),)).fetchall():
+            if row["report_id"] not in seen_ids:
+                seen_ids.add(row["report_id"])
+                report_rows.append(row)
+    for code in owasp_codes:
+        for row in conn.execute("SELECT * FROM hacktivity_reports WHERE owasp LIKE ?", ("%{}%".format(code),)).fetchall():
+            if row["report_id"] not in seen_ids:
+                seen_ids.add(row["report_id"])
+                report_rows.append(row)
+
+    click.echo("Related HackerOne reports ({}):".format(len(report_rows)))
+    if not report_rows:
+        click.echo("  (none synced locally - run 'bugbounty-intel sync --source hackerone' first)")
+    for i, r in enumerate(report_rows, 1):
+        _print_report(i, r)
+
+    from ..collectors.portswigger import reference_pages
+    matches = {k: v for k, v in reference_pages().items() if category.lower() in k.lower()}
+    click.echo("\nRelated PortSwigger reference:")
+    if matches:
+        for k, v in matches.items():
+            click.echo("  {} -> {}".format(k, v))
+    else:
+        click.echo("  (no direct reference page match for '{}')".format(category))
+    conn.close()
+
+
+@cli.command()
 @click.argument("report_id")
 @click.pass_context
 def report(ctx, report_id):

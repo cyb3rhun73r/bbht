@@ -69,6 +69,12 @@ GO_TOOLS = {
     "tlsx": "projectdiscovery/tlsx",
     "trivy": "aquasecurity/trivy",
     "interactsh-client": ("projectdiscovery/interactsh", "client"),
+    # Recon additions: live-host probing, JS-aware crawling, historical
+    # URL/param mining, and passive subdomain enumeration.
+    "httpx": "projectdiscovery/httpx",
+    "katana": "projectdiscovery/katana",
+    "gau": "lc/gau",
+    "amass": "owasp-amass/amass",
 }
 
 # Pure-Python tools: vendored as source, no compiled binary needed.
@@ -78,6 +84,9 @@ PY_TOOLS = {
     "commix": "https://github.com/commixproject/commix/archive/refs/heads/master.zip",
     "jwt_tool": "https://github.com/ticarpi/jwt_tool/archive/refs/heads/master.zip",
     "corsy": "https://github.com/s0md3v/Corsy/archive/refs/heads/master.zip",
+    # Parameter discovery/mining - finds hidden GET/POST params by
+    # differential response analysis.
+    "arjun": "https://github.com/s0md3v/Arjun/archive/refs/heads/master.zip",
 }
 
 

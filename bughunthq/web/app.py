@@ -110,6 +110,7 @@ ALLOWED_TOOLS = {
     "sqlmap", "dalfox", "commix", "ffuf", "corsy", "tlsx", "nuclei",
     "wpscan", "git-dumper", "trivy", "jwt_tool", "interactsh-client",
     "subfinder", "amass", "curl",
+    "httpx", "katana", "gau", "arjun",
 }
 
 TOOL_TIMEOUT_SECONDS = int(os.environ.get("BHQ_TOOL_TIMEOUT", "900"))

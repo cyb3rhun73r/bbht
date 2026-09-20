@@ -137,8 +137,16 @@ TOOL_HINTS = {
                            "-d \"{{\\\"query\\\":\\\"{{__schema{{types{{name}}}}}}\\\"}}\"",
     # A07 Identification & Authentication Failures
     "jwt_tool": "jwt_tool \"{token}\" -M at",
+    "jwt_tool_confusion": "jwt_tool \"{token}\" -X k -pk public_key.pem",
     # A10 Server-Side Request Forgery
     "interactsh-client": "interactsh-client",
+    # Recon additions
+    "httpx": "httpx -u \"{url}\" -title -status-code -tech-detect -silent",
+    "katana": "katana -u \"{url}\" -jc -silent",
+    "gau": "gau \"{host}\"",
+    "arjun": "arjun -u \"{url}\" -oT arjun-results.txt",
+    "graphql-batching-check": "curl -s -X POST \"{url}\" -H \"Content-Type: application/json\" "
+                               "-d \"[{{\\\"query\\\":\\\"{{__typename}}\\\"}},{{\\\"query\\\":\\\"{{__typename}}\\\"}}]\"",
 }
 
 # Pure-Python tools vendored as source (no separate runtime needed) rather
@@ -149,11 +157,17 @@ PY_SCRIPT_TOOLS = {
     "commix": os.path.join("commix", "commix.py"),
     "jwt_tool": os.path.join("jwt_tool", "jwt_tool.py"),
     "corsy": os.path.join("corsy", "corsy.py"),
+    # NOTE: verify this path against the vendored copy after running
+    # fetch_tools.py once - Arjun's upstream entry-point filename has moved
+    # between releases (arjun.py at repo root in older tags, arjun/__main__.py
+    # in newer ones supporting `python -m arjun`). Update here if it's wrong.
+    "arjun": os.path.join("arjun", "arjun.py"),
 }
 
 # Compiled binaries tools/fetch_tools.py fetches - kept in sync with that
 # script's GO_TOOLS keys, used here only to report Setup-tab status.
-GO_TOOL_NAMES = ["nuclei", "subfinder", "ffuf", "dalfox", "tlsx", "trivy", "interactsh-client"]
+GO_TOOL_NAMES = ["nuclei", "subfinder", "ffuf", "dalfox", "tlsx", "trivy",
+                  "interactsh-client", "httpx", "katana", "gau", "amass"]
 
 
 def bundled_tools_dir():
@@ -678,6 +692,13 @@ class Recon:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "graphql-introspect",
                                     TOOL_HINTS["graphql-introspect"].format(url=exp["detail"]),
                                     "A05,API9", "T1213"))
+                s.append(self._sug(
+                    "GraphQL batching/aliasing (potential rate-limit or brute-force bypass)",
+                    "P4", exp["detail"], "manual review / graphql-batching-check",
+                    TOOL_HINTS["graphql-batching-check"].format(url=exp["detail"]) +
+                    "  # if both queries resolve in one HTTP request, test whether "
+                    "aliased mutations (e.g. repeated login attempts) bypass per-request rate limiting",
+                    "API4,API6", "T1110"))
             elif "wordpress" in kind:
                 s.append(self._sug(exp["kind"], sev, exp["detail"], "wpscan",
                                     TOOL_HINTS["wpscan"].format(base=base), "A06", "T1588.006"))
@@ -711,6 +732,12 @@ class Recon:
             elif alg == "none":
                 finding = "JWT declares alg:none (server may accept unsigned tokens!)"
                 sev = "P1"
+            elif alg in ("RS256", "RS384", "RS512", "ES256", "ES384", "ES512"):
+                finding = "JWT uses asymmetric alg {} (test algorithm confusion: resign as HS256 using the public key as the HMAC secret)".format(alg)
+                sev = "P2"
+                s.append(self._sug(finding, sev, jwt["host"], "jwt_tool",
+                                    TOOL_HINTS["jwt_tool_confusion"].format(token=jwt["token"]), "A07,API2", "T1606"))
+                continue
             else:
                 finding = "JWT observed in traffic (alg: {})".format(alg)
                 sev = "P4"
@@ -799,6 +826,18 @@ class Recon:
             s.append(self._sug("{} endpoint(s) mined from JS bundles".format(len(self.js_endpoints)), "P5",
                                 sample, "manual review", "Review js_endpoints list for undocumented API routes.",
                                 "A01,API9", "T1592.002"))
+
+        # Endpoints crawled with no query-string params discovered are prime
+        # candidates for hidden/undocumented parameter mining - a lot of
+        # real bugs (mass assignment, debug flags, IDOR) live behind params
+        # that never appear in a normal crawl.
+        unparameterized = sorted(u for u in self.crawled_urls if u not in self.params)
+        if unparameterized:
+            sample_url = unparameterized[0]
+            s.append(self._sug(
+                "{} crawled endpoint(s) with no query params found - mine for hidden params".format(
+                    len(unparameterized)), "P5", sample_url, "arjun",
+                TOOL_HINTS["arjun"].format(url=sample_url), "A05,API9", "T1595.002"))
 
         for sec in self.possible_secrets:
             s.append(self._sug(sec["kind"], "P1", sec["source"], "manual review",
