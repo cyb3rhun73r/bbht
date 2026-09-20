@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bug Hunt HQ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0f1115; color:#d8dee9; font-family: ui-monospace, "SF Mono", Consolas, monospace; margin:0; }
+  header { padding: 16px 20px; border-bottom: 1px solid #2a2f3a; }
+  header h1 { margin:0; font-size: 18px; }
+  header p { margin: 4px 0 0; color:#8b93a7; font-size: 13px; }
+  main { padding: 20px; max-width: 1100px; margin: 0 auto; }
+  .panel { background:#161922; border:1px solid #2a2f3a; border-radius:8px; padding:16px; margin-bottom:18px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input[type=text], input[type=number] { background:#0f1115; border:1px solid #2a2f3a; color:#d8dee9; padding:8px 10px; border-radius:6px; }
+  input[type=text] { flex:1; min-width:240px; }
+  button { background:#3b6ef6; color:white; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-weight:600; }
+  button:hover { background:#2f5bd6; }
+  button.secondary { background:#2a2f3a; }
+  button.secondary:hover { background:#343a48; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  label.chk { display:flex; align-items:center; gap:6px; color:#f2c94c; font-size:13px; }
+  pre#log { background:#000; color:#8fe388; padding:12px; border-radius:6px; height:260px; overflow:auto; font-size:12px; white-space:pre-wrap; }
+  table { width:100%; border-collapse: collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #2a2f3a; vertical-align:top; }
+  th { color:#8b93a7; font-weight:600; }
+  .sev-P1 { color:#ff6b6b; font-weight:700; }
+  .sev-P2 { color:#ffa94d; font-weight:700; }
+  .sev-P3 { color:#f2c94c; }
+  .sev-P4 { color:#8fe388; }
+  .sev-P5 { color:#8b93a7; }
+  code { background:#0f1115; padding:2px 6px; border-radius:4px; }
+  .warn { background:#2a1f1f; border:1px solid #7a3c3c; color:#ffb4b4; padding:10px 14px; border-radius:6px; margin-bottom:18px; font-size:13px; }
+  .runbtn { background:#1f9d55; }
+  .runbtn:hover { background:#188144; }
+  #tool-log { background:#000; color:#c9d1d9; padding:12px; border-radius:6px; height:220px; overflow:auto; font-size:12px; white-space:pre-wrap; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bug Hunt HQ</h1>
+  <p>Recon &amp; attack-surface triage. Authorized security testing only.</p>
+</header>
+<main>
+  <div class="warn">
+    Only run this against a target you have explicit written permission to test
+    (an in-scope bug bounty / pentest engagement, a CTF box, or infrastructure you own).
+    Every job and every tool run below requires you to tick the authorization box.
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <input id="domain" type="text" placeholder="example.com">
+      <label class="chk"><input id="authorized" type="checkbox"> I am authorized to test this target</label>
+      <button id="start">Start recon</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Log</h3>
+    <pre id="log">idle.</pre>
+  </div>
+
+  <div class="panel">
+    <h3>Suggestions</h3>
+    <table id="sugtable">
+      <thead><tr><th>Sev</th><th>Finding</th><th>Location</th><th>Tool</th><th>Command</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Attack chains</h3>
+    <div id="chains"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Tool run output</h3>
+    <pre id="tool-log"></pre>
+  </div>
+</main>
+
+<script>
+let currentJob = null;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function startRecon() {
+  const domain = document.getElementById('domain').value.trim();
+  const authorized = document.getElementById('authorized').checked;
+  if (!domain) { alert('Enter a domain'); return; }
+  if (!authorized) { alert('Tick the authorization checkbox first.'); return; }
+
+  document.getElementById('log').textContent = '';
+  document.getElementById('sugtable').querySelector('tbody').innerHTML = '';
+  document.getElementById('chains').innerHTML = '';
+
+  const resp = await fetch('/api/jobs', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({domain, authorized}),
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    alert('Could not start job: ' + (err.detail || resp.statusText));
+    return;
+  }
+  const data = await resp.json();
+  currentJob = data.job_id;
+  streamLog(currentJob);
+}
+
+function streamLog(jobId) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/jobs/${jobId}`);
+  const logEl = document.getElementById('log');
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'log') {
+      logEl.textContent += msg.line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    } else if (msg.type === 'complete') {
+      renderResults(msg.job);
+    }
+  };
+}
+
+function renderResults(job) {
+  const tbody = document.getElementById('sugtable').querySelector('tbody');
+  tbody.innerHTML = '';
+  (job.suggestions || []).forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="sev-${esc(s.severity)}">${esc(s.severity)}</td>
+      <td>${esc(s.finding)}<br><small>${esc(s.owasp)} ${esc(s.mitre)}</small></td>
+      <td>${esc(s.location)}</td>
+      <td>${esc(s.tool)}</td>
+      <td><code>${esc(s.command)}</code></td>
+      <td></td>`;
+    if (s.tool !== 'manual review') {
+      const btn = document.createElement('button');
+      btn.textContent = 'Run';
+      btn.className = 'runbtn';
+      btn.onclick = () => runTool(s.command);
+      tr.lastElementChild.appendChild(btn);
+    }
+    tbody.appendChild(tr);
+  });
+
+  const chainsEl = document.getElementById('chains');
+  chainsEl.innerHTML = '';
+  (job.chains || []).forEach(c => {
+    const div = document.createElement('div');
+    div.style.marginBottom = '12px';
+    div.innerHTML = `<strong class="sev-${esc(c.severity)}">${esc(c.severity)} - ${esc(c.name)}</strong>
+      <div><small>${esc(c.owasp)} ${esc(c.mitre)}</small></div>
+      <div>${esc(c.why)}</div>
+      <pre>${esc(c.steps)}</pre>`;
+    chainsEl.appendChild(div);
+  });
+}
+
+async function runTool(command) {
+  if (!document.getElementById('authorized').checked) {
+    alert('Tick the authorization checkbox before running a tool.');
+    return;
+  }
+  if (!currentJob) return;
+  const toolLog = document.getElementById('tool-log');
+  toolLog.style.display = 'block';
+  toolLog.textContent = `$ ${command}\n`;
+
+  const resp = await fetch(`/api/jobs/${currentJob}/run-tool`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({command, authorized: true}),
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    toolLog.textContent += `[!] ${err.detail || resp.statusText}\n`;
+    return;
+  }
+  const data = await resp.json();
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/runs/${currentJob}/${data.run_id}`);
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'log') {
+      toolLog.textContent += msg.line + '\n';
+      toolLog.scrollTop = toolLog.scrollHeight;
+    } else if (msg.type === 'complete') {
+      toolLog.textContent += `\n[exit code ${msg.returncode}]\n`;
+    }
+  };
+}
+
+document.getElementById('start').addEventListener('click', startRecon);
+</script>
+</body>
+</html>

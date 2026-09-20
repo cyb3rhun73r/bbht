@@ -1,0 +1,13 @@
+services:
+  bughunthq:
+    build: .
+    image: bughunthq-web
+    ports:
+      # Bind to localhost only by default - this app can execute active
+      # recon/exploitation tools against whatever target you give it, so
+      # don't expose it on a public interface without adding your own auth.
+      - "127.0.0.1:8000:8000"
+    environment:
+      - BHQ_TOOL_TIMEOUT=900
+      - BHQ_JOB_TTL=3600
+    restart: unless-stopped

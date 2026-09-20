@@ -1,0 +1,9 @@
+.git
+**/__pycache__
+**/*.pyc
+bughunthq/tools/sqlmap
+bughunthq/tools/git-dumper
+bughunthq/tools/commix
+bughunthq/tools/jwt_tool
+bughunthq/tools/corsy
+bughunthq/tools/*.exe
