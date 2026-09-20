@@ -35,6 +35,14 @@
   .runbtn { background:#1f9d55; }
   .runbtn:hover { background:#188144; }
   #tool-log { background:#000; color:#c9d1d9; padding:12px; border-radius:6px; height:220px; overflow:auto; font-size:12px; white-space:pre-wrap; display:none; }
+  .steps { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .step { padding:6px 12px; border-radius:14px; border:1px solid #2a2f3a; color:#8b93a7; font-size:12px; }
+  .step.active { border-color:#3b6ef6; color:#dbe4ff; background:#182140; }
+  .step.pass { border-color:#1f9d55; color:#8fe388; }
+  .badge { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+  .badge-CONFIRMED { background:#3a1414; color:#ff8080; }
+  .badge-NOT_REPRODUCIBLE { background:#132a17; color:#8fe388; }
+  .badge-NOT_APPLICABLE, .badge-ERROR { background:#242832; color:#8b93a7; }
 </style>
 </head>
 <body>
@@ -58,6 +66,14 @@
   </div>
 
   <div class="panel">
+    <h3>Progress</h3>
+    <div class="steps" id="steps">
+      <span class="step" data-phase="subdomains">1. Subdomains</span>
+      <span class="step" data-phase="crawl">2. Crawl</span>
+      <span class="step" data-phase="params">3. Parameter tests</span>
+      <span class="step" data-phase="suggestions">4. Suggestions</span>
+      <span class="step" data-phase="done">5. Done</span>
+    </div>
     <h3>Log</h3>
     <pre id="log">idle.</pre>
   </div>
@@ -65,7 +81,7 @@
   <div class="panel">
     <h3>Suggestions</h3>
     <table id="sugtable">
-      <thead><tr><th>Sev</th><th>Finding</th><th>Location</th><th>Tool</th><th>Command</th><th></th></tr></thead>
+      <thead><tr><th>Sev</th><th>Finding</th><th>Location</th><th>Tool</th><th>Command</th><th>Status</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -113,6 +129,17 @@ async function startRecon() {
   streamLog(currentJob);
 }
 
+function setPhase(phase) {
+  document.querySelectorAll('#steps .step').forEach(el => {
+    const order = ['subdomains', 'crawl', 'params', 'suggestions', 'done'];
+    const elIdx = order.indexOf(el.dataset.phase);
+    const curIdx = order.indexOf(phase);
+    el.classList.remove('active', 'pass');
+    if (elIdx === curIdx) el.classList.add('active');
+    else if (elIdx < curIdx || phase === 'done') el.classList.add('pass');
+  });
+}
+
 function streamLog(jobId) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws/jobs/${jobId}`);
@@ -122,16 +149,21 @@ function streamLog(jobId) {
     if (msg.type === 'log') {
       logEl.textContent += msg.line + '\n';
       logEl.scrollTop = logEl.scrollHeight;
+    } else if (msg.type === 'phase') {
+      setPhase(msg.phase);
     } else if (msg.type === 'complete') {
+      setPhase('done');
       renderResults(msg.job);
     }
   };
 }
 
+const VALIDATABLE = ['reflected parameter', 'open redirect', 'ssti confirmed', 'crlf'];
+
 function renderResults(job) {
   const tbody = document.getElementById('sugtable').querySelector('tbody');
   tbody.innerHTML = '';
-  (job.suggestions || []).forEach(s => {
+  (job.suggestions || []).forEach((s, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="sev-${esc(s.severity)}">${esc(s.severity)}</td>
@@ -139,13 +171,24 @@ function renderResults(job) {
       <td>${esc(s.location)}</td>
       <td>${esc(s.tool)}</td>
       <td><code>${esc(s.command)}</code></td>
+      <td id="status-${idx}"></td>
       <td></td>`;
+    const actions = tr.lastElementChild;
     if (s.tool !== 'manual review') {
       const btn = document.createElement('button');
       btn.textContent = 'Run';
       btn.className = 'runbtn';
       btn.onclick = () => runTool(s.command);
-      tr.lastElementChild.appendChild(btn);
+      actions.appendChild(btn);
+    }
+    const findingLower = s.finding.toLowerCase();
+    if (VALIDATABLE.some(v => findingLower.includes(v))) {
+      const vbtn = document.createElement('button');
+      vbtn.textContent = 'Validate';
+      vbtn.className = 'secondary';
+      vbtn.style.marginLeft = '6px';
+      vbtn.onclick = () => validateSuggestion(idx, vbtn);
+      actions.appendChild(vbtn);
     }
     tbody.appendChild(tr);
   });
@@ -195,6 +238,34 @@ async function runTool(command) {
       toolLog.textContent += `\n[exit code ${msg.returncode}]\n`;
     }
   };
+}
+
+async function validateSuggestion(idx, btn) {
+  if (!document.getElementById('authorized').checked) {
+    alert('Tick the authorization checkbox before validating a finding.');
+    return;
+  }
+  if (!currentJob) return;
+  btn.disabled = true;
+  const before = btn.textContent;
+  btn.textContent = 'Checking...';
+  try {
+    const resp = await fetch(`/api/jobs/${currentJob}/suggestions/${idx}/validate`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({authorized: true}),
+    });
+    const data = await resp.json();
+    const cell = document.getElementById(`status-${idx}`);
+    if (resp.ok) {
+      cell.innerHTML = `<span class="badge badge-${esc(data.status)}">${esc(data.status.replace('_', ' '))}</span>`;
+    } else {
+      cell.textContent = data.detail || 'error';
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = before;
+  }
 }
 
 document.getElementById('start').addEventListener('click', startRecon);

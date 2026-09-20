@@ -12,6 +12,7 @@ below. Do not point this at a target you do not have explicit written
 permission to test.
 """
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -19,6 +20,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
@@ -32,6 +34,9 @@ from bughunthq.bughunthq import (
     child_env,
     resolve_tool_argv,
 )
+
+# Ordered scan phases, used to drive the live progress indicator in the UI.
+PHASES = ["subdomains", "crawl", "params", "suggestions", "done"]
 
 app = FastAPI(title="Bug Hunt HQ")
 
@@ -68,12 +73,17 @@ class ToolRun(BaseModel):
     authorized: bool
 
 
+class ValidateRequest(BaseModel):
+    authorized: bool
+
+
 def _new_job(domain, opts):
     job_id = uuid.uuid4().hex[:12]
     job = {
         "id": job_id,
         "domain": domain,
         "status": "running",
+        "phase": "queued",
         "created": time.time(),
         "log": [],
         "log_cond": threading.Condition(),
@@ -88,15 +98,24 @@ def _new_job(domain, opts):
             job["log"].append(str(msg))
             job["log_cond"].notify_all()
 
+    def set_phase(phase):
+        job["phase"] = phase
+        log_cb("[phase] {}".format(phase))
+
     def worker():
         try:
             recon = Recon(domain, log_cb, opts)
             job["recon"] = recon
+            set_phase("subdomains")
             recon.enumerate_subdomains()
+            set_phase("crawl")
             recon.crawl_and_discover()
+            set_phase("params")
             recon.test_params()
+            set_phase("suggestions")
             recon.build_suggestions()
             recon.build_attack_chains()
+            set_phase("done")
             job["status"] = "done"
         except Exception as e:
             job["status"] = "error"
@@ -124,6 +143,7 @@ def _job_snapshot(job):
         "id": job["id"],
         "domain": job["domain"],
         "status": job["status"],
+        "phase": job["phase"],
         "error": job["error"],
         "hosts": recon.subdomains if recon else [],
         "suggestions": recon.suggestions if recon else [],
@@ -181,6 +201,7 @@ async def job_log_socket(ws: WebSocket, job_id: str):
         return
 
     sent = 0
+    last_phase = None
     try:
         while True:
             with job["log_cond"]:
@@ -189,6 +210,9 @@ async def job_log_socket(ws: WebSocket, job_id: str):
                 sent = len(job["log"])
             for line in lines:
                 await ws.send_json({"type": "log", "line": line})
+            if job["phase"] != last_phase:
+                last_phase = job["phase"]
+                await ws.send_json({"type": "phase", "phase": last_phase})
             if job["status"] in ("done", "error") and sent >= len(job["log"]):
                 await ws.send_json({"type": "complete", "job": _job_snapshot(job)})
                 break
@@ -283,6 +307,63 @@ async def run_log_socket(ws: WebSocket, job_id: str, run_id: str):
                 break
     except WebSocketDisconnect:
         pass
+
+
+def _validate_suggestion(recon, sug):
+    """Re-fires the exact PoC URL a suggestion was built from and re-checks
+    the same condition that produced it, so a finding can be confirmed
+    reproducible (or flagged as no longer reproducing) without eyeballing
+    raw responses by hand. Covers the browser-checkable finding types the
+    Recon engine itself produces (reflection, open redirect, SSTI, CRLF)."""
+    finding = sug["finding"].lower()
+    url = sug["location"]
+    try:
+        qs = parse_qs(urlsplit(url).query)
+        payload = next(iter(qs.values()), [""])[0] if qs else ""
+
+        if "reflected parameter" in finding:
+            marker = next((v for v in payload.split() if v.startswith("bhq")), payload)
+            r = recon._get(url)
+            ok = r is not None and marker in r.text
+            return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
+
+        if "open redirect" in finding:
+            r = recon._get(url, allow_redirects=False)
+            loc = r.headers.get("Location", "") if r is not None else ""
+            ok = r is not None and r.status_code in (301, 302, 303, 307, 308) and "example.org" in loc
+            return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
+
+        if "ssti confirmed" in finding:
+            m = re.search(r"(\d+)\s*\*\s*(\d+)", payload)
+            if not m:
+                return {"status": "NOT_APPLICABLE"}
+            product = str(int(m.group(1)) * int(m.group(2)))
+            r = recon._get(url)
+            ok = r is not None and product in r.text and payload not in r.text
+            return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
+
+        if "crlf" in finding:
+            m = re.search(r"X-Bhq-Crlf-[0-9a-z]+", payload, re.I)
+            if not m:
+                return {"status": "NOT_APPLICABLE"}
+            r = recon._get(url)
+            ok = r is not None and m.group(0).lower() in {h.lower() for h in r.headers.keys()}
+            return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
+    except Exception as e:
+        return {"status": "ERROR", "detail": str(e)}
+
+    return {"status": "NOT_APPLICABLE"}
+
+
+@app.post("/api/jobs/{job_id}/suggestions/{index}/validate")
+def validate_suggestion_endpoint(job_id: str, index: int, body: ValidateRequest):
+    job = _job_or_404(job_id)
+    if not body.authorized:
+        raise HTTPException(status_code=403, detail="authorized must be true to validate a finding")
+    recon = job.get("recon")
+    if recon is None or index < 0 or index >= len(recon.suggestions):
+        raise HTTPException(status_code=404, detail="unknown suggestion index")
+    return _validate_suggestion(recon, recon.suggestions[index])
 
 
 @app.get("/")
