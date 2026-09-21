@@ -380,10 +380,16 @@ def _validate_suggestion(recon, sug):
     url = sug["location"]
     try:
         qs = parse_qs(urlsplit(url).query)
-        payload = next(iter(qs.values()), [""])[0] if qs else ""
+        # A tested URL can carry other, untouched query params alongside the
+        # one actually holding the test marker/payload (e.g. ?utm_source=fb&
+        # q=bhqXYZ123) - search every value for the one matching this check's
+        # pattern instead of blindly taking whichever param sorts first.
+        all_values = [v for values in qs.values() for v in values]
 
         if "reflected parameter" in finding:
-            marker = next((v for v in payload.split() if v.startswith("bhq")), payload)
+            marker = next((v for v in all_values if v.startswith("bhq")), None)
+            if marker is None:
+                return {"status": "NOT_APPLICABLE"}
             r = recon._get(url)
             ok = r is not None and marker in r.text
             return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
@@ -395,20 +401,27 @@ def _validate_suggestion(recon, sug):
             return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
 
         if "ssti confirmed" in finding:
-            m = re.search(r"(\d+)\s*\*\s*(\d+)", payload)
-            if not m:
+            match = None
+            for v in all_values:
+                m = re.search(r"(\d+)\s*\*\s*(\d+)", v)
+                if m:
+                    match = (m, v)
+                    break
+            if match is None:
                 return {"status": "NOT_APPLICABLE"}
+            m, payload = match
             product = str(int(m.group(1)) * int(m.group(2)))
             r = recon._get(url)
             ok = r is not None and product in r.text and payload not in r.text
             return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
 
         if "crlf" in finding:
-            m = re.search(r"X-Bhq-Crlf-[0-9a-z]+", payload, re.I)
-            if not m:
+            match = next((re.search(r"X-Bhq-Crlf-[0-9a-z]+", v, re.I) for v in all_values
+                          if re.search(r"X-Bhq-Crlf-[0-9a-z]+", v, re.I)), None)
+            if match is None:
                 return {"status": "NOT_APPLICABLE"}
             r = recon._get(url)
-            ok = r is not None and m.group(0).lower() in {h.lower() for h in r.headers.keys()}
+            ok = r is not None and match.group(0).lower() in {h.lower() for h in r.headers.keys()}
             return {"status": "CONFIRMED" if ok else "NOT_REPRODUCIBLE"}
     except Exception as e:
         return {"status": "ERROR", "detail": str(e)}
