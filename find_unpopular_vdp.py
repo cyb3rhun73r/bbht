@@ -86,6 +86,45 @@ def _has_direct_contact(program):
     return bool(program.get("contact_email") or program.get("securitytxt_url"))
 
 
+def check_policy_link(url, timeout=15):
+    """Ping a policy URL and report its state.
+
+    Returns a dict: {"status": <http code or 'error'>, "final_url": <str>,
+    "redirected": <bool>, "note": <short label>}. Used to catch rebrands
+    (amoCRM -> Kommo) and dead policy pages before you rely on a listing.
+    urllib follows redirects, so comparing the final URL to the original
+    reveals a move; bot-blockers (Cloudflare) show up as 403/503.
+    """
+    if not url or not str(url).startswith(("http://", "https://")):
+        return {"status": "n/a", "final_url": url, "redirected": False,
+                "note": "no url"}
+    headers = {"User-Agent": "Mozilla/5.0 (bbht-find-unpopular-vdp)"}
+    for method in ("HEAD", "GET"):
+        try:
+            req = urllib.request.Request(url, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                final = resp.geturl()
+                redirected = final.rstrip("/") != url.rstrip("/")
+                return {
+                    "status": resp.status,
+                    "final_url": final,
+                    "redirected": redirected,
+                    "note": f"moved -> {final}" if redirected else "ok",
+                }
+        except HTTPError as exc:
+            # 405 => server dislikes HEAD; retry with GET before giving up.
+            if method == "HEAD" and exc.code in (403, 405, 501):
+                continue
+            note = "blocked (bot filter)" if exc.code in (403, 503) else "dead"
+            return {"status": exc.code, "final_url": url, "redirected": False,
+                    "note": note}
+        except (URLError, OSError) as exc:
+            return {"status": "error", "final_url": url, "redirected": False,
+                    "note": f"unreachable ({exc.reason if hasattr(exc, 'reason') else exc})"}
+    return {"status": "error", "final_url": url, "redirected": False,
+            "note": "unreachable"}
+
+
 def obscurity_score(program):
     """Higher score => less popular / lower competition but still reachable.
 
@@ -189,6 +228,12 @@ def main(argv=None):
         help="only programs that publish a direct contact channel",
     )
     parser.add_argument(
+        "--check-links",
+        action="store_true",
+        help="ping the shown programs' policy URLs to flag redirects "
+        "(rebrands) and dead links",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="emit results as JSON instead of a table",
@@ -216,6 +261,11 @@ def main(argv=None):
     if args.limit and args.limit > 0:
         ranked = ranked[: args.limit]
 
+    # Only check the programs we actually show, so this stays fast and polite.
+    if args.check_links:
+        for r in ranked:
+            r["link_check"] = check_policy_link(r["policy_url"])
+
     if args.json:
         print(json.dumps(ranked, indent=2))
         return
@@ -240,6 +290,12 @@ def main(argv=None):
             f"{r['score']:>5}  {program:<34}  {r['bounty']:<8}  "
             f"{managed:<9}  {contact}"
         )
+
+    if args.check_links:
+        print("\n# Policy link check (redirects usually mean a rebrand):")
+        for r in ranked:
+            chk = r["link_check"]
+            print(f"  [{str(chk['status']):>5}] {r['program']}: {chk['note']}")
 
     print(
         "\nReminder: engage only in authorized, good-faith research and follow "

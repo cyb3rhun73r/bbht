@@ -48,8 +48,17 @@ python3 find_unpopular_vdp.py
 python3 find_unpopular_vdp.py --no-bounty --self-managed --safe-harbor --json
 ```
 
+```
+# verify the shown programs' policy links (flags rebrands & dead pages)
+python3 find_unpopular_vdp.py -n 10 --no-bounty --self-managed --check-links
+```
+
 Useful flags: `--no-bounty`, `--self-managed`, `--safe-harbor`, `--with-contact`,
-`-n/--limit N`, `-s/--source <url-or-file>`, `--json`.
+`--check-links`, `-n/--limit N`, `-s/--source <url-or-file>`, `--json`.
+
+`--check-links` pings only the programs it displays, so it stays fast. A
+`moved -> …` note means the program rebranded or relocated its policy (e.g.
+amoCRM → Kommo), and `dead` / `blocked` flag stale or bot-protected pages.
 
 Use the output only for authorized, good-faith research and always follow each
 program's published policy and scope.
