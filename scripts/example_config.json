@@ -1,0 +1,30 @@
+{
+  "_comment": "Copy this to target_config.json and fill in with an IN-SCOPE target you are authorized to test, using sessions for accounts YOU control.",
+  "base_url": "https://staging.example-target.com",
+  "sessions": {
+    "userA": {"headers": {"Cookie": "session=REPLACE_WITH_USERA_SESSION"}},
+    "userB": {"headers": {"Cookie": "session=REPLACE_WITH_USERB_SESSION"}},
+    "anon":  {"headers": {}}
+  },
+  "owned_ids": {
+    "userA": ["1001", "1002"],
+    "userB": ["2001", "2002"]
+  },
+  "templates": [
+    {
+      "name": "get_invoice",
+      "method": "GET",
+      "path": "/api/invoices/{id}",
+      "headers": {},
+      "body": null
+    },
+    {
+      "name": "get_profile",
+      "method": "GET",
+      "path": "/api/users/{id}/profile",
+      "headers": {},
+      "body": null
+    }
+  ],
+  "id_range": ["1001", "1002", "2001", "2002", "2003"]
+}
