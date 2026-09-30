@@ -1,21 +1,23 @@
 ---
 name: bug-hunting
-description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab, with emphasis on Broken Access Control, IDOR/BOLA, and auth/session logic flaws — currently the highest-paying, most in-demand vulnerability classes on HackerOne. Use this whenever the user wants to test an in-scope target for these bug classes, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, authorization testing, or JWT/session bypass testing, even if they don't name this skill directly. This skill packages real-world disclosed-report patterns (not generic OWASP text) to help prioritize what to test first for fastest payout. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
+description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne) plus pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, or JWT/session bypass testing, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
 ---
 
-# Bug Hunting: Access Control, IDOR, and Auth Logic
+# Bug Hunting: Real-World Vulnerability Pattern Library
 
 ## Why this skill exists
-Scanners (nuclei, sqlmap, XSS fuzzers) already cover XSS, SQLi, known-CVE,
-and misconfig well — see the `scripts/` recon tooling elsewhere in this
-repo for that. What scanners *cannot* do is decide whether a given
-response means "this user shouldn't be able to see this" — that requires
-understanding the app's intended workflow. That's exactly why **Improper
-Access Control and IDOR are the #1 most exploited, fastest-rising bounty
-categories on HackerOne** (per HackerOne's 2025 report: IAC payouts up
-134% YoY). This skill exists to make that manual-judgment work faster and
-more systematic, using patterns pulled from real disclosed reports rather
-than generic checklists.
+Generic OWASP checklists tell you *what* a vulnerability class is. This
+skill tells you *where disclosed reports actually found each one* — which
+endpoint types, which parameters, which frameworks — pulled from real
+HackerOne disclosures, so testing time goes to the highest-yield spots
+first instead of guessing. It leans hardest on Broken Access Control and
+IDOR because those are currently the #1 most exploited, fastest-rising
+bounty category on HackerOne (IAC payouts up 134% YoY per HackerOne's 2025
+report) and the one generic scanners can't find at all — they require
+understanding what the app's workflow is *supposed* to allow. The other
+reference files (XSS/CSRF, SSRF, SQLi/SSTI/RCE, info disclosure) cover the
+rest of what disclosed reports show pays well, with real examples to
+calibrate against.
 
 ## Hard rule
 Only test targets the user has explicit authorization for (an enrolled
@@ -67,6 +69,21 @@ reference file has the decode/swap/re-encode pattern.
   reuse, race conditions across OTP/reset steps, MFA-skip by direct URL)
   together with `scripts/authz_checklist.md`'s full manual checklist.
 
+### 3b. Other vulnerability classes (once access-control/auth pass is done)
+These have their own reference files with real disclosed examples and a
+"fast test approach" section each — read the relevant one before testing
+that class so effort goes to where disclosed reports actually find bugs,
+not a generic sweep:
+- **XSS / CSRF** → `references/xss-csrf-patterns.md`
+- **SSRF** → `references/ssrf-patterns.md`
+- **SQL injection / SSTI / RCE** → `references/sqli-rce-ssti-patterns.md`
+- **Information disclosure / leaked secrets** → `references/info-disclosure-patterns.md`
+
+Rough prioritization if time is limited: info disclosure and SSRF are the
+fastest to sweep and still pay well; XSS is high-volume but low per-bug
+value now; SQLi/SSTI/RCE are rarer finds but pay the most per bug when
+confirmed — don't center a time-boxed session on them alone.
+
 ### 4. Verify before reporting
 Nothing from step 3 is a finding until manually confirmed:
 - Reproduce twice, from a clean session (no leftover cookies/state).
@@ -83,6 +100,15 @@ Nothing from step 3 is a finding until manually confirmed:
 - `references/auth-jwt-patterns.md` — JWT bypass techniques and
   session/password-reset/MFA logic flaws, each tied to a disclosed report
   so the user can calibrate what "found" looks like.
+- `references/xss-csrf-patterns.md` — disclosed XSS/CSRF examples
+  (Expedia, Shopify, Bumble, Zendesk, etc.) and fast test approaches.
+- `references/ssrf-patterns.md` — disclosed SSRF examples (GitLab,
+  Shopify, Snapchat's DNS-rebinding bypass, etc.), OOB detection workflow.
+- `references/sqli-rce-ssti-patterns.md` — disclosed SQLi (Mail.ru, DoD),
+  SSTI→RCE (Uber's $10k Jinja2 finding, Shopify, Fastify), and general RCE
+  examples, with escalation and safety notes.
+- `references/info-disclosure-patterns.md` — disclosed secrets-leak
+  examples (FetLife, Starbucks, Reddit, GSA) and how to triage severity.
 
 ## Related scripts (same repo, `scripts/`)
 - `access_check.py` — replays requests across sessions/ID ranges, flags
