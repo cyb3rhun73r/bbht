@@ -1,12 +1,9 @@
-# Access Control / IDOR / Auth Logic Toolkit
+# Bug Hunting Toolkit
 
-Semi-automated helpers for the vulnerability classes that don't fit a
-regular scanner: broken access control, IDOR, and auth/session logic
-flaws. These are currently the highest-paying, most in-demand bug classes
-on HackerOne -- and the reason they pay well is that they require a human
-to judge what "unauthorized" means for a given app. These scripts speed up
-the repetitive part (replaying requests across sessions/IDs) and leave the
-judgment part to you.
+Scripts supporting the `.claude/skills/bug-hunting/` skill: fast
+low-hanging-fruit scanning, semi-automated IDOR/access-control/auth
+testing for the classes that don't fit a regular scanner, report
+generation, and a lightweight program/finding tracker.
 
 **Authorization:** only ever point these at assets explicitly in scope for
 a bug bounty program you're enrolled in, or your own lab. Use only
@@ -18,7 +15,22 @@ accounts you registered yourself). Every result these scripts flag is a
 
 ```bash
 pip install requests pyjwt
+# quickwin_scan.sh also benefits from (optional but recommended):
+#   subfinder, httpx, dnsx, subzy, gau or katana -- see bbht/install.sh
 ```
+
+## 0. quickwin_scan.sh -- automated low-hanging-fruit discovery
+
+```bash
+./quickwin_scan.sh target.com
+```
+
+Sweeps subdomains for takeover candidates, checks every live host for CORS
+misconfiguration and clickjacking header issues, and collects URLs with
+redirect-like parameters for manual open-redirect testing. Outputs
+candidates to a timestamped results directory -- see
+`.claude/skills/bug-hunting/references/low-hanging-fruit.md` for how to
+confirm each one and build a PoC.
 
 ## 1. access_check.py -- IDOR / broken access control
 
@@ -59,13 +71,45 @@ workflow bypass, password reset token strength, MFA bypass, rate
 limiting, session fixation, etc. Work through this on every target after
 running the scripts above.
 
+## 4. generate_report.py -- report writeup generator
+
+```bash
+python3 generate_report.py                              # interactive
+python3 generate_report.py --from-json finding.json --out report.md
+```
+
+Once you've confirmed a finding, this formats it into a clean,
+submission-ready report (title, severity, steps to reproduce, PoC
+request/response, impact, remediation). It does not decide whether you
+have a real bug -- that's still your judgment call.
+
+## 5. tracker.py -- program and finding tracker
+
+```bash
+python3 tracker.py program add --name "Acme" --platform hackerone --url https://hackerone.com/acme --scope "*.acme.com"
+python3 tracker.py finding add --program "Acme" --target api.acme.com --vuln-class IDOR --status testing
+python3 tracker.py finding update --id 1 --status submitted
+python3 tracker.py finding list --status testing
+python3 tracker.py summary
+```
+
+CSV-backed (`programs.csv`, `findings.csv` in the working directory) so
+it's also easy to open in a spreadsheet. Useful once you're running more
+than one program in parallel.
+
 ## Suggested workflow per target
 
-1. Recon (subdomains, live hosts) with the rest of `bbht`.
-2. Map the app manually once -- note every endpoint that takes an object
+1. Pick a program -- see
+   `.claude/skills/bug-hunting/references/choosing-programs.md`. Track it
+   with `tracker.py program add`.
+2. Recon (subdomains, live hosts) with the rest of `bbht`.
+3. Run `quickwin_scan.sh` and work through the low-hanging-fruit reference
+   file for a fast first result.
+4. Map the app manually once -- note every endpoint that takes an object
    ID or a privilege-sensitive action.
-3. Create 2 test accounts, generate one resource per account.
-4. Run `access_check.py` across those endpoints/IDs.
-5. Run `jwt_probe.py` against any JWT you find.
-6. Work `authz_checklist.md` by hand for business logic and auth flows.
-7. Manually verify every flag before writing up a report.
+5. Create 2 test accounts, generate one resource per account.
+6. Run `access_check.py` across those endpoints/IDs.
+7. Run `jwt_probe.py` against any JWT you find.
+8. Work `authz_checklist.md` by hand for business logic and auth flows.
+9. Manually verify every flag before writing up a report with
+   `generate_report.py`, and log it with `tracker.py finding add/update`.

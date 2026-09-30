@@ -1,0 +1,9 @@
+# tracker.py local data (personal findings/program tracking, not repo content)
+programs.csv
+findings.csv
+
+# quickwin_scan.sh output
+quickwin_results/
+
+# local target configs with real session tokens -- never commit these
+target_config.json

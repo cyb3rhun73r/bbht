@@ -1,6 +1,6 @@
 ---
 name: bug-hunting
-description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, or JWT/session bypass testing, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
+description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, rate limiting, brute force, mobile app testing, APK analysis, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, JWT/session bypass testing, or picking/choosing a bug bounty program, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
 ---
 
 # Bug Hunting: Real-World Vulnerability Pattern Library
@@ -26,6 +26,13 @@ test accounts they control or are permitted to test with. If this isn't
 clearly established, ask before proceeding — don't assume authorization
 from context.
 
+## 0. No target yet? Start with program selection
+If the user hasn't picked a program, **read `references/choosing-programs.md`
+first** — which program to hunt matters as much as which bugs to look
+for. It covers what makes a program beginner-friendly (wide scope, pays
+for Low/Medium severity, fast triage, newer/less-hunted), red flags to
+avoid, and a practical first-week plan using `scripts/tracker.py`.
+
 ## Workflow
 
 ### 1. Scope and recon (if not already done)
@@ -40,7 +47,22 @@ redirect, CORS misconfiguration, and clickjacking are fast to check
 (minutes, not hours), need no custom payload development, and many
 programs still pay for them. This is the highest-value use of the first
 30-45 minutes on any new target — especially if the user needs a result
-soon. Only move to the deeper workflow below once this pass is done.
+soon. Run `scripts/quickwin_scan.sh <domain>` to automate the discovery
+part of this pass (subdomain takeover sweep, CORS check, clickjacking
+header check, open-redirect param discovery) — it outputs candidates,
+which still need manual confirmation per that reference file. Only move
+to the deeper workflow below once this pass is done.
+
+Also check `references/rate-limit-bypass-patterns.md` at this stage —
+missing/bypassable rate limiting on login, OTP, and password-reset
+endpoints is nearly as fast to check as the low-hanging-fruit classes
+above and pays well (a disclosed $12,000 2FA-bypass example is in there).
+
+If the target has a mobile app in scope, **read
+`references/mobile-api-patterns.md`** — mobile apps are consistently
+under-tested relative to web apps on the same program (higher setup cost
+= less competition for the same scope), and findings there are often
+rated higher severity than their web equivalent.
 
 ### 2. Map the app and pick test candidates
 Walk the app manually (or review a captured traffic log/HAR) and list
@@ -100,12 +122,33 @@ Nothing from step 3 is a finding until manually confirmed:
   attacker could actually do with it.
 
 `scripts/authz_checklist.md` section 6 has the report-writeup structure.
+Once confirmed, run `scripts/generate_report.py` to turn your notes into
+a clean, submission-ready writeup (title, severity, steps, PoC request/
+response, impact, remediation) instead of formatting it from scratch —
+it prompts interactively or takes a JSON file (see its docstring).
+
+### 5. Track it
+Log the program (`scripts/tracker.py program add`) and the finding
+(`scripts/tracker.py finding add`) as you go, and update status
+(`finding update --id <n> --status submitted`) as it moves through
+triage. `scripts/tracker.py summary` gives a quick pipeline/payout view
+once the user is running more than one program at a time — useful for
+seeing which programs and vuln classes are actually converting.
 
 ## Reference files
+- `references/choosing-programs.md` — how to pick a beginner-friendly
+  program (scope, payout policy, triage speed), red flags, first-week plan.
 - `references/low-hanging-fruit.md` — subdomain takeover, open redirect,
   CORS misconfig, clickjacking, and other fast/easy checks with exact
   disclosed payloads (Tumblr, Zomato, GlassWire, Twitter Periscope,
   etc.) — start here on a new target.
+- `references/rate-limit-bypass-patterns.md` — missing rate limits and
+  bypass techniques (IP-rotation headers, race conditions) with disclosed
+  examples (MTN Group, Mail.ru, a $12k 2FA bypass) and impact-math guidance
+  for the report.
+- `references/mobile-api-patterns.md` — APK/IPA static analysis, deep
+  link hijacking, insecure local storage, mobile-vs-web API gaps, with
+  disclosed examples (8x8, GlassWire, Reverb.com).
 - `references/idor-bola-patterns.md` — BOLA taxonomy from a 2026 empirical
   study of 84+ disclosed reports, plus specific disclosed examples
   (Shopify, HackerOne's own program, DoD, etc.) and where to look first.
@@ -123,9 +166,18 @@ Nothing from step 3 is a finding until manually confirmed:
   examples (FetLife, Starbucks, Reddit, GSA) and how to triage severity.
 
 ## Related scripts (same repo, `scripts/`)
+- `quickwin_scan.sh <domain>` — automates the low-hanging-fruit discovery
+  pass (subdomain takeover sweep, CORS check, clickjacking header check,
+  open-redirect param discovery). Outputs candidates for manual
+  confirmation into a timestamped results directory.
 - `access_check.py` — replays requests across sessions/ID ranges, flags
   likely IDOR/access-control violations for manual review.
 - `jwt_probe.py` — generates JWT tamper variants for manual verification.
+- `generate_report.py` — turns confirmed-finding notes into a clean,
+  submission-ready report (interactive or from a JSON file).
+- `tracker.py` — local CSV-backed tracker for programs and
+  findings-in-progress (`program add/list`, `finding add/update/list`,
+  `summary`).
 - `authz_checklist.md` — full manual checklist for business logic, auth
   flows, and cases no script can safely flag.
 - `example_config.json` / `README.md` — setup for the scripts above.
