@@ -1,6 +1,6 @@
 ---
 name: bug-hunting
-description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne) plus pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, or JWT/session bypass testing, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
+description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, or JWT/session bypass testing, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
 ---
 
 # Bug Hunting: Real-World Vulnerability Pattern Library
@@ -33,6 +33,14 @@ Confirm the target domain/app is in scope. If recon hasn't been run yet,
 point the user at the recon scripts elsewhere in this repo (subdomain
 enum, live-host probing, nuclei) to map the attack surface first — this
 skill picks up once there's a concrete app/API to test.
+
+### 1b. Low-hanging fruit pass (do this first, especially on a new target or for a first paid report)
+**Read `references/low-hanging-fruit.md` now.** Subdomain takeover, open
+redirect, CORS misconfiguration, and clickjacking are fast to check
+(minutes, not hours), need no custom payload development, and many
+programs still pay for them. This is the highest-value use of the first
+30-45 minutes on any new target — especially if the user needs a result
+soon. Only move to the deeper workflow below once this pass is done.
 
 ### 2. Map the app and pick test candidates
 Walk the app manually (or review a captured traffic log/HAR) and list
@@ -94,6 +102,10 @@ Nothing from step 3 is a finding until manually confirmed:
 `scripts/authz_checklist.md` section 6 has the report-writeup structure.
 
 ## Reference files
+- `references/low-hanging-fruit.md` — subdomain takeover, open redirect,
+  CORS misconfig, clickjacking, and other fast/easy checks with exact
+  disclosed payloads (Tumblr, Zomato, GlassWire, Twitter Periscope,
+  etc.) — start here on a new target.
 - `references/idor-bola-patterns.md` — BOLA taxonomy from a 2026 empirical
   study of 84+ disclosed reports, plus specific disclosed examples
   (Shopify, HackerOne's own program, DoD, etc.) and where to look first.
