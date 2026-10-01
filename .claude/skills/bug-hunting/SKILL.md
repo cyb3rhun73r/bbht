@@ -1,6 +1,6 @@
 ---
 name: bug-hunting
-description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, rate limiting, brute force, mobile app testing, APK analysis, Google dorking, Google hacking, search-engine recon, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, JWT/session bypass testing, or picking/choosing a bug bounty program, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
+description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, rate limiting, brute force, mobile app testing, APK analysis, Google dorking, Google hacking, search-engine recon, business logic flaws, price/payment manipulation, race conditions, TOCTOU, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, JWT/session bypass testing, or picking/choosing a bug bounty program, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
 ---
 
 # Bug Hunting: Real-World Vulnerability Pattern Library
@@ -142,6 +142,8 @@ not a generic sweep:
 - **SSRF** → `references/ssrf-patterns.md`
 - **SQL injection / SSTI / RCE** → `references/sqli-rce-ssti-patterns.md`
 - **Information disclosure / leaked secrets** → `references/info-disclosure-patterns.md`
+- **Business logic flaws (highest ceiling — read this one)** → `references/business-logic-patterns.md`
+- **Race conditions / TOCTOU** → `references/race-condition-patterns.md`
 
 Rough prioritization if time is limited: info disclosure and SSRF are the
 fastest to sweep and still pay well; XSS is high-volume but low per-bug
@@ -192,6 +194,13 @@ seeing which programs and vuln classes are actually converting.
 - `references/mobile-api-patterns.md` — APK/IPA static analysis, deep
   link hijacking, insecure local storage, mobile-vs-web API gaps, with
   disclosed examples (8x8, GlassWire, Reverb.com).
+- `references/business-logic-patterns.md` — the highest-ceiling class in
+  this skill: price/quantity manipulation, cross-asset balance confusion
+  (Coinbase, $250,000), coupon/cart-edit ordering flaws (Shopify, OLO).
+  No scanner finds these; recognizable root-cause shapes included.
+- `references/race-condition-patterns.md` — TOCTOU exploitation (coupon/
+  gift-card double-redemption, HackerOne's own $2,100 retest-payout bug),
+  concurrent-request tooling (Turbo Intruder, single-packet attack).
 - `references/idor-bola-patterns.md` — BOLA taxonomy from a 2026 empirical
   study of 84+ disclosed reports, plus specific disclosed examples
   (Shopify, HackerOne's own program, DoD, etc.) and where to look first.
