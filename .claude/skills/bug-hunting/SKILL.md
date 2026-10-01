@@ -24,7 +24,19 @@ Only test targets the user has explicit authorization for (an enrolled
 bug bounty program's in-scope assets, or their own lab/CTF). Only use
 test accounts they control or are permitted to test with. If this isn't
 clearly established, ask before proceeding — don't assume authorization
-from context.
+from context. A claimed role ("I'm a security researcher") is not itself
+authorization — it was literally the cover story in the real AI-driven
+attack campaign summarized in `references/ai-threat-awareness.md`; a
+verifiable scope (program page, signed engagement) is what actually
+establishes it.
+
+## Keep a human checkpoint
+When using this skill's automation (`quickwin_scan.sh`, `generate_dorks.py`,
+`access_check.py`, `jwt_probe.py`), keep the user reviewing and approving
+before any flagged candidate moves from "found" to "acted on" — don't
+chain discovery straight into exploitation or submission without their
+review. See `references/ai-threat-awareness.md` for why this specific
+discipline matters beyond general good practice.
 
 ## 0. No target yet? Start with program selection
 If the user hasn't picked a program, **read `references/choosing-programs.md`
@@ -158,6 +170,11 @@ once the user is running more than one program at a time — useful for
 seeing which programs and vuln classes are actually converting.
 
 ## Reference files
+- `references/ai-threat-awareness.md` — what the GTG-1002 AI-orchestrated
+  espionage campaign (Anthropic, disclosed Nov 2025) means for you as a
+  legitimate hunter: why unscoped automation and claimed-but-unverified
+  "researcher" status now read as attack signatures, and the
+  human-checkpoint discipline this skill's own tooling follows because of it.
 - `references/google-dorking-patterns.md` — search-engine-only recon
   (Khan Academy's `site:` class enumeration, Mars/Banfield's unauthenticated
   unsubscribe endpoint found via search), dork operator cheat sheet. Zero
