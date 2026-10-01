@@ -44,12 +44,24 @@ skill picks up once there's a concrete app/API to test.
 ### 1a. Google dorking pass (do this before anything that touches the target directly)
 **Read `references/google-dorking-patterns.md` first of all.** This is
 the only check in the whole skill that needs zero interaction with the
-target — just search-engine queries in a browser. Run the config/secrets
-and action-verb dorks (`inurl:join`, `inurl:unsubscribe`, `inurl:reset`,
-etc.) against the target domain before anything else. Real disclosed
-examples (Khan Academy, Mars/Banfield) were found exactly this way — an
-unauthenticated endpoint or enumerable URL pattern that a search engine
-had already indexed. Zero setup cost, so there's no reason to skip it.
+target — just search-engine queries. Real disclosed examples (Khan
+Academy, Mars/Banfield) were found exactly this way — an unauthenticated
+endpoint or enumerable URL pattern that a search engine had already
+indexed. Zero setup cost, so there's no reason to skip it.
+
+Run `scripts/generate_dorks.py <domain>` to get the full categorized
+query list (secrets/config, admin panels, enumerable action endpoints,
+exposed documents, error pages, subdomain discovery). **Then actually run
+each query yourself using your own web-search tool** (not the user's
+browser) and review the results — don't just hand the user a query list
+and stop. Summarize anything that looks like a real hit (an indexed
+admin panel, a config file, a URL matching the join/unsubscribe/reset/
+invite pattern) and flag it as a candidate for the user to verify is
+in-scope before they interact with it further. Querying a search engine
+this way is normal search-API usage, not scraping, so it's fine to do
+directly — just never scrape Google's results pages or automate around
+its Terms of Service, and never visit/interact with a flagged URL
+yourself without the user confirming scope first.
 
 ### 1b. Low-hanging fruit pass (do this first among active checks, especially on a new target or for a first paid report)
 **Read `references/low-hanging-fruit.md` now.** Subdomain takeover, open
@@ -180,6 +192,9 @@ seeing which programs and vuln classes are actually converting.
   examples (FetLife, Starbucks, Reddit, GSA) and how to triage severity.
 
 ## Related scripts (same repo, `scripts/`)
+- `generate_dorks.py <domain>` — generates the categorized Google-dorking
+  query list for a target. Run the queries with your own web-search tool
+  (not by having the user paste them into a browser) and review hits.
 - `quickwin_scan.sh <domain>` — automates the low-hanging-fruit discovery
   pass (subdomain takeover sweep, CORS check, clickjacking header check,
   open-redirect param discovery). Outputs candidates for manual

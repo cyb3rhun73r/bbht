@@ -89,6 +89,10 @@ situation, and it can itself be worth reporting if sensitive cached data
 is still retrievable after the "fix."
 
 ## Fast test approach
+0. Run `scripts/generate_dorks.py <domain>` to get the full categorized
+   query list instead of typing each one by hand. If you're working with
+   Claude Code, have it run the queries itself via its own web-search
+   tool and summarize hits — see `SKILL.md` step 1a.
 1. Run the config/secrets dorks against the target domain first — zero
    risk, pure search.
 2. Run the action-verb/endpoint dorks (`inurl:join`, `inurl:unsubscribe`,
