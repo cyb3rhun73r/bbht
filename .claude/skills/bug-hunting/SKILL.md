@@ -1,6 +1,6 @@
 ---
 name: bug-hunting
-description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, rate limiting, brute force, mobile app testing, APK analysis, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, JWT/session bypass testing, or picking/choosing a bug bounty program, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
+description: Methodology and tooling for hunting web/API bugs on authorized bug bounty programs (HackerOne, Bugcrowd, Intigriti) or your own lab. Covers fast low-hanging-fruit checks (subdomain takeover, open redirect, CORS misconfiguration, clickjacking) plus Broken Access Control, IDOR/BOLA, and auth/session logic flaws (the highest-paying, most in-demand classes on HackerOne), and pattern libraries for XSS, CSRF, SSRF, SQL injection, SSTI, RCE, and information/secrets disclosure — all grounded in real disclosed HackerOne reports with exact payloads used, not generic OWASP text. Use this whenever the user wants to test an in-scope target for any of these bug classes, wants an easy/fast first finding, plan a hunting session against a bounty program, interpret results from access_check.py or jwt_probe.py, or wants a recommended test order for a new target. Also use it when the user mentions bug bounty hunting, IDOR, BOLA, broken access control, subdomain takeover, open redirect, CORS, clickjacking, rate limiting, brute force, mobile app testing, APK analysis, Google dorking, Google hacking, search-engine recon, XSS, CSRF, SSRF, SQL injection, SSTI, RCE, information disclosure, JWT/session bypass testing, or picking/choosing a bug bounty program, even if they don't name this skill directly. It does NOT cover building generic exploit/attack frameworks, and every test it guides must be run only against targets the user is explicitly authorized to test.
 ---
 
 # Bug Hunting: Real-World Vulnerability Pattern Library
@@ -41,7 +41,17 @@ point the user at the recon scripts elsewhere in this repo (subdomain
 enum, live-host probing, nuclei) to map the attack surface first — this
 skill picks up once there's a concrete app/API to test.
 
-### 1b. Low-hanging fruit pass (do this first, especially on a new target or for a first paid report)
+### 1a. Google dorking pass (do this before anything that touches the target directly)
+**Read `references/google-dorking-patterns.md` first of all.** This is
+the only check in the whole skill that needs zero interaction with the
+target — just search-engine queries in a browser. Run the config/secrets
+and action-verb dorks (`inurl:join`, `inurl:unsubscribe`, `inurl:reset`,
+etc.) against the target domain before anything else. Real disclosed
+examples (Khan Academy, Mars/Banfield) were found exactly this way — an
+unauthenticated endpoint or enumerable URL pattern that a search engine
+had already indexed. Zero setup cost, so there's no reason to skip it.
+
+### 1b. Low-hanging fruit pass (do this first among active checks, especially on a new target or for a first paid report)
 **Read `references/low-hanging-fruit.md` now.** Subdomain takeover, open
 redirect, CORS misconfiguration, and clickjacking are fast to check
 (minutes, not hours), need no custom payload development, and many
@@ -136,6 +146,10 @@ once the user is running more than one program at a time — useful for
 seeing which programs and vuln classes are actually converting.
 
 ## Reference files
+- `references/google-dorking-patterns.md` — search-engine-only recon
+  (Khan Academy's `site:` class enumeration, Mars/Banfield's unauthenticated
+  unsubscribe endpoint found via search), dork operator cheat sheet. Zero
+  interaction with the target — do this before anything else.
 - `references/choosing-programs.md` — how to pick a beginner-friendly
   program (scope, payout policy, triage speed), red flags, first-week plan.
 - `references/low-hanging-fruit.md` — subdomain takeover, open redirect,
