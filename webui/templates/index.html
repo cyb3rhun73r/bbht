@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bbht dashboard</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .warn { background: #3a2a0f; border: 1px solid #a66a1a; color: #ffcf8a; padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; }
+  .panel { background: #171a21; border: 1px solid #2a2e38; border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; color: #a7adbb; margin-bottom: 4px; margin-top: 10px; }
+  input[type=text], select { width: 100%; box-sizing: border-box; background: #0f1115; border: 1px solid #2a2e38; color: #e6e6e6; padding: 8px 10px; border-radius: 6px; font-size: 14px; }
+  .checkbox-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; font-size: 13px; color: #cbd0db; }
+  button { margin-top: 16px; background: #3b6ef5; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #22262f; }
+  th { color: #a7adbb; font-weight: 600; }
+  .status { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .status.queued { background: #333; color: #ccc; }
+  .status.running { background: #2a4a7a; color: #9ec2ff; }
+  .status.completed { background: #1f4d2e; color: #8fe3a7; }
+  .status.failed { background: #4d1f1f; color: #ff9a9a; }
+  .job-link { color: #8fb3ff; cursor: pointer; text-decoration: underline; }
+  #log { background: #0a0c0f; border: 1px solid #2a2e38; border-radius: 8px; padding: 12px; height: 360px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<h1>🔎 bbht dashboard</h1>
+<div class="warn">
+  ⚠ Only trigger scans against targets you are explicitly authorized to test.
+  {% if not token_required %}<br>No API_TOKEN is configured -- this dashboard is unauthenticated. Do not expose it beyond your local network.{% endif %}
+</div>
+
+<div class="panel">
+  <h3>New scan</h3>
+  <label for="tool">Tool</label>
+  <select id="tool">
+    {% for key, info in tools.items() %}
+    <option value="{{ key }}">{{ info.label }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="target">Target domain</label>
+  <input type="text" id="target" placeholder="example.com">
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="confirm">
+    <label for="confirm" style="margin: 0;">I confirm this target is in my authorized bug bounty scope (or my own lab), and this action is logged.</label>
+  </div>
+
+  <button id="launch">Run</button>
+  <span id="launch-error" style="color:#ff9a9a; margin-left: 10px; font-size: 13px;"></span>
+</div>
+
+<div class="panel">
+  <h3>Jobs</h3>
+  <table id="jobs-table">
+    <thead><tr><th>ID</th><th>Tool</th><th>Target</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>Live log <span id="log-job-id" style="color:#8fb3ff"></span></h3>
+  <div id="log">Select a job above to view its log.</div>
+</div>
+
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+function authHeaders() {
+  return token ? {'X-API-Token': token} : {};
+}
+
+async function refreshJobs() {
+  const res = await fetch('/api/jobs' + (token ? '?token=' + encodeURIComponent(token) : ''));
+  if (!res.ok) return;
+  const jobs = await res.json();
+  const tbody = document.querySelector('#jobs-table tbody');
+  tbody.innerHTML = '';
+  for (const j of jobs) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="job-link" data-id="${j.id}">${j.id}</span></td>
+      <td>${j.tool}</td>
+      <td>${j.target}</td>
+      <td><span class="status ${j.status}">${j.status}</span></td>
+      <td>${new Date(j.created_at).toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  }
+  document.querySelectorAll('.job-link').forEach(el => {
+    el.addEventListener('click', () => watchJob(el.dataset.id));
+  });
+}
+
+let currentStream = null;
+function watchJob(jobId) {
+  if (currentStream) currentStream.close();
+  document.getElementById('log-job-id').textContent = '#' + jobId;
+  const logEl = document.getElementById('log');
+  logEl.textContent = '';
+  const url = `/api/jobs/${jobId}/stream` + (token ? '?token=' + encodeURIComponent(token) : '');
+  currentStream = new EventSource(url);
+  currentStream.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+    if (data.line !== undefined) {
+      logEl.textContent += data.line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    if (data.done) {
+      currentStream.close();
+      refreshJobs();
+    }
+  };
+}
+
+document.getElementById('launch').addEventListener('click', async () => {
+  const tool = document.getElementById('tool').value;
+  const target = document.getElementById('target').value.trim();
+  const confirmed = document.getElementById('confirm').checked;
+  const errEl = document.getElementById('launch-error');
+  errEl.textContent = '';
+
+  if (!target) { errEl.textContent = 'Target is required.'; return; }
+  if (!confirmed) { errEl.textContent = 'You must confirm authorization scope.'; return; }
+
+  const res = await fetch('/api/jobs' + (token ? '?token=' + encodeURIComponent(token) : ''), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', ...authHeaders()},
+    body: JSON.stringify({tool, target, confirm_scope: confirmed}),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    errEl.textContent = data.error || 'failed to start job';
+    return;
+  }
+  await refreshJobs();
+  watchJob(data.id);
+});
+
+refreshJobs();
+setInterval(refreshJobs, 5000);
+</script>
+
+</body>
+</html>
