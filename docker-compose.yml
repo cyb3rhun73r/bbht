@@ -1,0 +1,22 @@
+services:
+  bbht:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: bbht:latest
+    container_name: bbht-dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      # REQUIRED for anything beyond local/LAN use -- set a real secret.
+      # Access the dashboard at http://<host>:8080/?token=<API_TOKEN>
+      - API_TOKEN=${BBHT_API_TOKEN:-}
+      - PORT=8080
+    volumes:
+      # Persists programs.csv, findings.csv, quickwin_results/, and the
+      # dashboard's audit log across restarts/rebuilds.
+      - bbht-data:/app/scripts_data
+    restart: unless-stopped
+
+volumes:
+  bbht-data:

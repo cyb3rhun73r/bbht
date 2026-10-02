@@ -88,6 +88,54 @@ package references for modern distros — usable as a starting point for
 classic recon tooling, but `setup.sh` is the one to run for this
 toolkit's own scripts and skill.
 
+## Docker: run everything in a container with a live web dashboard
+
+A Linux container packaging every script plus the recon tools
+(`subfinder`, `httpx`, `dnsx`, `nuclei`, `gau`, `subzy`), with a small
+authenticated web dashboard (`webui/`) to trigger scans and watch them
+run in real time from a browser — instead of SSHing in per machine.
+
+### Run it
+
+```bash
+BBHT_API_TOKEN=$(openssl rand -hex 16) docker compose up --build
+```
+
+Then open `http://<host>:8080/?token=<the token just printed/exported>`.
+
+Or without compose:
+```bash
+docker build -f docker/Dockerfile -t bbht:latest .
+docker run -p 8080:8080 -e API_TOKEN=change-me -v bbht-data:/app/scripts_data bbht:latest
+```
+
+### What the dashboard does
+- Pick a tool (`quickwin_scan.sh` or `generate_dorks.py`), enter a
+  target, **check the "this target is in my authorized scope" box**
+  (required — every job is logged with this confirmation and the
+  requester's IP to `scripts/dashboard_audit.log`), and run it.
+- Watch the job's real-time status (queued → running → completed/failed)
+  and its live log output streaming in, via Server-Sent Events — no
+  polling a terminal.
+- `programs.csv`, `findings.csv`, and `quickwin_results/` persist in a
+  Docker volume (`bbht-data`), so they survive container rebuilts/restarts
+  across however many machines you run this on.
+
+### Security — read this before exposing it beyond your own machine
+This dashboard can trigger real network requests against whatever target
+you give it. Treat `API_TOKEN` like a real secret (`openssl rand -hex 16`
+is one way to generate one) — never run it with no token set except on
+`localhost`/a trusted LAN.
+
+If your team needs to reach it over the internet rather than a shared
+LAN/VPN: put a reverse proxy (Caddy, nginx, Cloudflare Tunnel, etc.) in
+front with TLS, and keep `API_TOKEN` set regardless — the app has no
+rate limiting or brute-force protection of its own, so don't rely on the
+token alone against a determined attacker who can reach the port
+directly. The scope-confirmation checkbox is a safeguard against
+accidental misuse by someone with legitimate access, not a security
+control against someone who reaches this without authorization at all.
+
 ## Using this on multiple machines / with a team
 
 - **Personal machines**: `git clone` + `./setup.sh` on each one. The
