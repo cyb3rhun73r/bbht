@@ -7,8 +7,15 @@
 # Run (see docker-compose.yml for the easier path):
 #   docker run -p 8080:8080 -e API_TOKEN=change-me -v bbht-data:/data bbht:latest
 
-FROM golang:1.23-bookworm AS tools
+FROM golang:1-bookworm AS tools
 
+# "1-bookworm" (not a pinned minor version like "1.23") tracks the
+# latest stable Go 1.x release. ProjectDiscovery tools bump their
+# minimum Go requirement often enough (hit this exact failure with
+# nuclei needing >= 1.26 while this was pinned to 1.23) that a fixed
+# version here becomes a recurring build break -- floating avoids that
+# whole class of failure going forward.
+#
 # Build the Go-based recon tools once, in a separate stage, so the final
 # image doesn't need the full Go toolchain.
 #
