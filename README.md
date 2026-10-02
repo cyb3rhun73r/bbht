@@ -97,11 +97,31 @@ run in real time from a browser — instead of SSHing in per machine.
 
 ### Run it
 
+One-time setup, first machine only:
 ```bash
-BBHT_API_TOKEN=$(openssl rand -hex 16) docker compose up --build
+cp .env.example .env
+python3 -c "import secrets; print('BBHT_API_TOKEN=' + secrets.token_hex(16))" >> .env
 ```
+(or `openssl rand -hex 16` instead of the Python one-liner if you
+prefer — `openssl` is normally preinstalled on Linux/macOS, and
+available via Git Bash/WSL on Windows). This writes your token into
+`.env`, which is gitignored on purpose — **never commit a real token
+value into `docker-compose.yml` or anywhere else git-tracked**, even in
+a private repo; secrets belong in untracked local files, not version
+control.
 
-Then open `http://<host>:8080/?token=<the token just printed/exported>`.
+Then, every time:
+```bash
+docker compose up --build
+```
+`docker compose` reads `.env` automatically. Open
+`http://<host>:8080/?token=<the value you generated>`.
+
+**On each additional machine or for each teammate**: repeat the
+one-time setup above to generate their own `.env` locally — `.env` is
+never shared via git, so copy it some other way (a password manager, a
+secrets vault, or just regenerate a fresh token per machine, which is
+the simpler and fine).
 
 Or without compose:
 ```bash

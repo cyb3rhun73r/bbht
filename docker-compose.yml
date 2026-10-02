@@ -8,7 +8,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # REQUIRED for anything beyond local/LAN use -- set a real secret.
+      # Reads from a local .env file (see .env.example) -- never commit
+      # a real token value into this tracked file itself.
       # Access the dashboard at http://<host>:8080/?token=<API_TOKEN>
       - API_TOKEN=${BBHT_API_TOKEN:-}
       - PORT=8080

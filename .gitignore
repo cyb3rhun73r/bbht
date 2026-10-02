@@ -10,3 +10,4 @@ target_config.json
 
 # dashboard audit log (local, per-deployment)
 dashboard_audit.log
+.env
