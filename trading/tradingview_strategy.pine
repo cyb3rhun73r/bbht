@@ -1,0 +1,75 @@
+//@version=6
+strategy("Intraday Score Strategy", overlay=true, initial_capital=5000,
+     default_qty_type=strategy.fixed, pyramiding=0, calc_on_every_tick=false,
+     commission_type=strategy.commission.percent, commission_value=0.025,
+     slippage=2)
+
+// ---- Inputs -----------------------------------------------------------
+mode      = input.string("Trend", "Mode", options=["Trend", "Mean-reversion"],
+     tooltip="Trend: buy strength. Mean-reversion: fade it (inverts every signal).")
+threshold = input.int(3, "Score threshold", minval=1, maxval=4)
+lookback  = input.int(12, "Breakout lookback (bars)", minval=2)
+atrMult   = input.float(1.5, "Stop = ATR x", step=0.25)
+rr        = input.float(2.0, "Target = R x", step=0.25)
+riskPct   = input.float(0.5, "Risk per trade (% equity)", step=0.1)
+maxLev    = input.float(2.0, "Max leverage", step=0.5)
+maxTrades = input.int(2, "Max trades per day", minval=1)
+entryWin  = input.session("0945-1500", "Entry window (exchange time)")
+dailyLoss = input.float(2.0, "Daily loss limit (% equity)", step=0.5)
+
+// ---- Indicators (same as signals.py) ----------------------------------
+vw     = ta.vwap(hlc3)                       // resets every session
+emaF   = ta.ema(close, 9)
+emaS   = ta.ema(close, 21)
+rsi    = ta.rsi(close, 14)
+atr    = ta.atr(14)
+prevHi = ta.highest(high, lookback)[1]
+prevLo = ta.lowest(low, lookback)[1]
+
+score = math.sign(emaF - emaS) + math.sign(close - vw)
+     + (rsi >= 50 and rsi <= 70 ? 1 : rsi >= 30 and rsi < 50 ? -1 : 0)
+     + (close > prevHi ? 1 : close < prevLo ? -1 : 0)
+sig = mode == "Trend" ? score : -score
+
+// ---- State ------------------------------------------------------------
+var int tradesToday = 0
+var float stopDist  = na
+if session.isfirstbar_regular
+    tradesToday := 0
+
+inWindow = not na(time(timeframe.period, entryWin))
+flat     = strategy.position_size == 0
+canTrade = inWindow and flat and tradesToday < maxTrades and not na(atr)
+
+dist = atrMult * atr
+qty  = math.floor(math.min(strategy.equity * riskPct / 100 / dist, strategy.equity * maxLev / close))
+
+// ---- Entries ----------------------------------------------------------
+if canTrade and qty > 0 and sig >= threshold
+    stopDist := dist
+    tradesToday += 1
+    strategy.entry("Long", strategy.long, qty=qty, alert_message="BUY {{ticker}} qty=" + str.tostring(qty))
+if canTrade and qty > 0 and sig <= -threshold
+    stopDist := dist
+    tradesToday += 1
+    strategy.entry("Short", strategy.short, qty=qty, alert_message="SELL {{ticker}} qty=" + str.tostring(qty))
+
+// ---- Exits: bracket from the actual fill price ------------------------
+if strategy.position_size > 0
+    strategy.exit("Long exit", "Long", stop=strategy.position_avg_price - stopDist,
+         limit=strategy.position_avg_price + rr * stopDist)
+if strategy.position_size < 0
+    strategy.exit("Short exit", "Short", stop=strategy.position_avg_price + stopDist,
+         limit=strategy.position_avg_price - rr * stopDist)
+
+// Intraday only: flatten on the last bar of the session
+if session.islastbar_regular
+    strategy.close_all(comment="EOD")
+
+strategy.risk.max_intraday_loss(dailyLoss, strategy.percent_of_equity)
+
+// ---- Visuals ----------------------------------------------------------
+plot(vw, "VWAP", color=color.orange)
+plot(emaF, "EMA 9", color=color.new(color.blue, 40))
+plot(emaS, "EMA 21", color=color.new(color.purple, 40))
+bgcolor(sig >= threshold ? color.new(color.green, 90) : sig <= -threshold ? color.new(color.red, 90) : na)
