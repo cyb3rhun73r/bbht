@@ -5,7 +5,7 @@ INSTALL_DIR="${HOME}/hexstrike-ai"
 
 sudo apt-get update
 # Install one by one so a missing package doesn't abort the rest
-for p in git python3 python3-venv python3-pip golang-go chromium chromium-driver \
+for p in git python3 python3-venv python3-pip python3-dev build-essential libffi-dev libssl-dev pkg-config golang-go chromium chromium-driver \
          nmap masscan sqlmap gobuster nikto dirb ffuf whatweb wafw00f amass \
          hydra john hashcat nuclei subfinder httpx-toolkit katana dnsenum theharvester \
          feroxbuster wpscan arjun dirsearch; do
@@ -30,8 +30,15 @@ done
 # HexStrike
 [ -d "$INSTALL_DIR" ] || git clone https://github.com/0x4m4/hexstrike-ai.git "$INSTALL_DIR"
 cd "$INSTALL_DIR"
+rm -rf venv
 python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
+if ! ./venv/bin/pip install -r requirements.txt; then
+  echo "!! pip failed on system Python ($(python3 --version)); retrying with Python 3.12 via uv"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
+  rm -rf venv && uv venv --python 3.12 venv
+  uv pip install --python venv/bin/python -r requirements.txt || { echo "!! dependency install FAILED"; exit 1; }
+fi
 
 echo
 echo "Done. Start the server:  cd $INSTALL_DIR && ./venv/bin/python hexstrike_server.py"
