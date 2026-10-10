@@ -13,8 +13,10 @@ for p in git python3 python3-venv python3-pip python3-dev build-essential libffi
 done
 
 # Go-based tools (fallbacks / ones Kali lacks)
-export GOPATH="$HOME/go"; export PATH="$PATH:$GOPATH/bin"
-grep -q 'go/bin' ~/.bashrc || echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
+# Separate GOPATH: a manually unpacked Go in ~/go would otherwise clash (GOPATH == GOROOT)
+unset GOROOT; export GOPATH="$HOME/gopath"; export PATH="/usr/bin:$PATH:$GOPATH/bin"
+grep -q 'gopath/bin' ~/.bashrc || echo 'export PATH=$PATH:$HOME/gopath/bin' >> ~/.bashrc
+echo "Using $(command -v go): $(go version)"
 for p in github.com/projectdiscovery/nuclei/v3/cmd/nuclei \
          github.com/projectdiscovery/httpx/cmd/httpx \
          github.com/projectdiscovery/subfinder/v2/cmd/subfinder \
@@ -30,15 +32,11 @@ done
 # HexStrike
 [ -d "$INSTALL_DIR" ] || git clone https://github.com/0x4m4/hexstrike-ai.git "$INSTALL_DIR"
 cd "$INSTALL_DIR"
-rm -rf venv
-python3 -m venv venv
-if ! ./venv/bin/pip install -r requirements.txt; then
-  echo "!! pip failed on system Python ($(python3 --version)); retrying with Python 3.12 via uv"
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
-  rm -rf venv && uv venv --python 3.12 venv
-  uv pip install --python venv/bin/python -r requirements.txt || { echo "!! dependency install FAILED"; exit 1; }
-fi
+# angr/pwntools don't build on Python 3.13+/3.14, so use Python 3.12 via uv
+command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh; }
+export PATH="$HOME/.local/bin:$PATH"
+rm -rf venv && uv venv --python 3.12 venv
+uv pip install --python venv/bin/python -r requirements.txt || { echo "!! dependency install FAILED"; exit 1; }
 
 echo
 echo "Done. Start the server:  cd $INSTALL_DIR && ./venv/bin/python hexstrike_server.py"
