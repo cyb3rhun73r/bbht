@@ -56,6 +56,23 @@ async def chat(req: ChatRequest):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+@app.post("/api/chat/sync")
+async def chat_sync(req: ChatRequest):
+    """Non-streaming variant for the iOS app."""
+    messages = [
+        {"role": m.role, "content": m.content[:4000]}
+        for m in req.messages[-MAX_TURNS:]
+        if m.role in ("user", "assistant") and m.content.strip()
+    ]
+    try:
+        r = await client.messages.create(
+            model=MODEL, max_tokens=700, system=SYSTEM_PROMPT, messages=messages
+        )
+        return {"reply": "".join(b.text for b in r.content if b.type == "text")}
+    except Exception:
+        return {"reply": "Kshama karo vatsa, abhi sampark nahi ho pa raha. Thodi der baad phir koshish karo."}
+
+
 @app.get("/")
 async def index():
     return FileResponse(STATIC / "index.html")
