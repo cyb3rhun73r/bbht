@@ -1,0 +1,9 @@
+.git
+.gitignore
+scripts/programs.csv
+scripts/findings.csv
+scripts/quickwin_results/
+scripts/dashboard_audit.log
+scripts/target_config.json
+__pycache__
+*.pyc
