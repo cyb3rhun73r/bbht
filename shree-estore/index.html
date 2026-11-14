@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shree.eStore – Premium Cleaning Solutions</title>
+<meta name="description" content="Shree.eStore – premium dish wash, hand wash, laundry, floor, toilet, bathroom, glass cleaners and car shampoo for homes, offices and industries.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#06283d; --ink2:#35546a; --bg:#f4fbff; --card:#ffffff;
+  --brand:#0a8fd6; --brand2:#12c6c0; --accent:#ffb703; --line:#d9ecf6;
+  --grad:linear-gradient(135deg,#0a8fd6 0%,#12c6c0 100%);
+  --shadow:0 18px 50px -18px rgba(10,111,160,.35);
+}
+@media (prefers-color-scheme:dark){
+  :root{--ink:#e8f6ff;--ink2:#9dbfd3;--bg:#04141f;--card:#0a2434;--line:#14405a;--shadow:0 18px 50px -18px rgba(0,0,0,.7)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;overflow-x:hidden}
+h1,h2,h3,.logo{font-family:Outfit,sans-serif;line-height:1.15}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+section{padding:90px 0;position:relative}
+.eyebrow{display:inline-block;font-weight:600;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);background:rgba(10,143,214,.12);padding:6px 14px;border-radius:99px;margin-bottom:14px}
+h2{font-size:clamp(1.9rem,4vw,2.9rem);font-weight:800;margin-bottom:14px}
+.lead{color:var(--ink2);max-width:640px}
+.center{text-align:center}.center .lead{margin:0 auto}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 26px;border-radius:99px;font-weight:600;border:0;cursor:pointer;font-size:1rem;transition:.25s;font-family:inherit}
+.btn-primary{background:var(--grad);color:#fff;box-shadow:0 10px 26px -8px rgba(10,143,214,.7)}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 16px 30px -8px rgba(10,143,214,.8)}
+.btn-ghost{background:rgba(255,255,255,.14);color:#fff;border:1.5px solid rgba(255,255,255,.55);backdrop-filter:blur(6px)}
+.btn-ghost:hover{background:#fff;color:var(--brand)}
+
+/* NAV */
+header{position:fixed;inset:0 0 auto 0;z-index:50;transition:.3s}
+header.scrolled{background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);box-shadow:0 4px 24px rgba(0,60,100,.12)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:74px}
+.logo{font-size:1.65rem;font-weight:800;color:#fff;letter-spacing:-.02em}
+.logo b{color:var(--accent)}
+header.scrolled .logo{color:var(--ink)}
+header.scrolled .logo b{color:var(--brand)}
+nav ul{display:flex;gap:32px;list-style:none;align-items:center}
+nav a{font-weight:500;color:#fff;opacity:.92;position:relative}
+header.scrolled nav a{color:var(--ink)}
+nav a:not(.btn)::after{content:"";position:absolute;left:0;bottom:-5px;height:2px;width:0;background:var(--accent);transition:.3s}
+nav a:not(.btn):hover::after{width:100%}
+.nav .btn{padding:10px 20px;background:#fff;color:var(--brand);font-size:.92rem}
+header.scrolled .nav .btn{background:var(--grad);color:#fff}
+.burger{display:none;background:none;border:0;cursor:pointer;width:34px;height:34px}
+.burger span{display:block;height:3px;background:#fff;margin:6px 0;border-radius:3px;transition:.3s}
+header.scrolled .burger span{background:var(--ink)}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;color:#fff;overflow:hidden;
+  background:radial-gradient(1200px 600px at 80% 10%,#27d3cd55,transparent 60%),linear-gradient(160deg,#04476e 0%,#0a8fd6 55%,#12c6c0 100%);padding:120px 0 80px}
+.hero .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;position:relative;z-index:2}
+.hero h1{font-size:clamp(2.6rem,6.2vw,4.8rem);font-weight:800;letter-spacing:-.03em}
+.hero h1 span{background:linear-gradient(90deg,#ffe28a,#ffb703);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:1.15rem;opacity:.93;margin:22px 0 34px;max-width:520px}
+.cta{display:flex;gap:14px;flex-wrap:wrap}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:34px}
+.chips span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:7px 15px;border-radius:99px;font-size:.88rem;backdrop-filter:blur(6px)}
+.bottle-stage{position:relative;height:460px;display:flex;align-items:center;justify-content:center}
+.blob{position:absolute;width:380px;height:380px;background:rgba(255,255,255,.14);border-radius:42% 58% 63% 37%/41% 44% 56% 59%;animation:morph 9s ease-in-out infinite;border:1px solid rgba(255,255,255,.3)}
+@keyframes morph{50%{border-radius:60% 40% 36% 64%/57% 62% 38% 43%;transform:rotate(14deg)}}
+.float{position:absolute;font-size:5.4rem;filter:drop-shadow(0 22px 24px rgba(0,40,70,.35));animation:bob 5s ease-in-out infinite}
+.float:nth-of-type(2){left:6%;top:8%;font-size:4.2rem;animation-delay:-1.5s}
+.float:nth-of-type(3){right:4%;bottom:6%;font-size:4.6rem;animation-delay:-3s}
+.float.main{font-size:10rem;position:relative}
+@keyframes bob{50%{transform:translateY(-22px) rotate(4deg)}}
+.bubbles{position:absolute;inset:0;z-index:1;pointer-events:none}
+.bubbles i{position:absolute;bottom:-80px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.75),rgba(255,255,255,.12) 60%);border:1px solid rgba(255,255,255,.4);animation:rise linear infinite}
+@keyframes rise{to{transform:translateY(-120vh) translateX(40px)}}
+.wave{position:absolute;bottom:-1px;left:0;width:100%;height:80px;z-index:3}
+
+/* MARQUEE */
+.marquee{background:var(--ink);color:#fff;padding:16px 0;overflow:hidden;white-space:nowrap}
+@media (prefers-color-scheme:dark){.marquee{background:#0a2434}}
+.marquee div{display:inline-block;animation:slide 28s linear infinite;font-family:Outfit;font-weight:600;font-size:1.05rem;letter-spacing:.04em}
+.marquee span{margin:0 26px;opacity:.9}.marquee span::before{content:"✦";color:var(--accent);margin-right:26px}
+@keyframes slide{to{transform:translateX(-50%)}}
+
+/* PRODUCTS */
+.filters{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:34px 0 40px}
+.filters button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:9px 20px;border-radius:99px;cursor:pointer;font-weight:500;font-family:inherit;transition:.2s}
+.filters button.on,.filters button:hover{background:var(--grad);color:#fff;border-color:transparent}
+.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:28px 24px;position:relative;overflow:hidden;transition:.35s;box-shadow:0 2px 0 var(--line)}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:var(--c,var(--grad))}
+.card:hover{transform:translateY(-10px);box-shadow:var(--shadow)}
+.card .ic{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;font-size:2.7rem;background:var(--bg);margin-bottom:18px;transition:.4s}
+.card:hover .ic{transform:rotate(-8deg) scale(1.1)}
+.card h3{font-size:1.3rem;margin-bottom:8px}
+.card p{color:var(--ink2);font-size:.94rem;margin-bottom:18px}
+.card a{font-weight:600;color:var(--brand);display:inline-flex;gap:6px;align-items:center}
+.card a:hover{gap:12px}
+.card.hide{display:none}
+.tag{position:absolute;top:18px;right:18px;font-size:.7rem;font-weight:700;background:var(--accent);color:#4a3000;padding:3px 10px;border-radius:99px}
+
+/* WHY */
+.why{background:linear-gradient(180deg,var(--bg),color-mix(in srgb,var(--brand) 9%,var(--bg)))}
+.why-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px;margin-top:50px}
+.why-item{background:var(--card);border-radius:24px;padding:32px 26px;border:1px solid var(--line);text-align:center;transition:.3s}
+.why-item:hover{box-shadow:var(--shadow);transform:translateY(-6px)}
+.why-item .n{width:66px;height:66px;margin:0 auto 18px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font-size:1.8rem;color:#fff;box-shadow:0 10px 20px -6px rgba(10,143,214,.6)}
+.why-item h3{margin-bottom:8px;font-size:1.2rem}.why-item p{color:var(--ink2);font-size:.94rem}
+
+/* ABOUT */
+.about .grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.about-art{position:relative;aspect-ratio:1;border-radius:36px;background:var(--grad);display:grid;place-items:center;font-size:9rem;overflow:hidden;box-shadow:var(--shadow)}
+.about-art::after{content:"";position:absolute;width:140%;height:60%;bottom:-30%;left:-20%;background:rgba(255,255,255,.18);border-radius:50%}
+.about-art small{position:absolute;left:18px;bottom:18px;z-index:2;background:#fff;color:var(--ink);padding:10px 16px;border-radius:16px;font-size:.88rem;font-weight:600;font-family:Outfit}
+.about ul{list-style:none;margin:24px 0 30px}
+.about li{padding-left:34px;position:relative;margin-bottom:12px}
+.about li::before{content:"✓";position:absolute;left:0;top:1px;width:23px;height:23px;border-radius:50%;background:var(--brand2);color:#fff;font-size:.8rem;display:grid;place-items:center;font-weight:700}
+
+/* AUDIENCE */
+.aud{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:44px}
+.aud div{background:var(--grad);color:#fff;border-radius:24px;padding:30px 20px;text-align:center;font-family:Outfit;font-weight:600;font-size:1.15rem;transition:.3s}
+.aud div:hover{transform:scale(1.05) rotate(-1deg)}
+.aud em{display:block;font-style:normal;font-size:2.4rem;margin-bottom:8px}
+
+/* TESTIMONIALS */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:26px;margin-top:46px}
+.t{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:34px;position:relative;box-shadow:var(--shadow)}
+.t::before{content:"“";position:absolute;top:-6px;right:26px;font-size:7rem;font-family:Outfit;color:var(--brand2);opacity:.35;line-height:1}
+.stars{color:var(--accent);letter-spacing:3px;margin-bottom:12px}
+.t h3{margin-bottom:10px;font-size:1.25rem}
+.t p{color:var(--ink2);margin-bottom:20px}
+.who{display:flex;gap:14px;align-items:center}
+.av{width:48px;height:48px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:700;font-family:Outfit}
+.who small{display:block;color:var(--ink2)}
+
+/* CONTACT */
+.contact{background:linear-gradient(160deg,#04476e,#0a8fd6 60%,#12c6c0);color:#fff;overflow:hidden}
+.contact .grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:start}
+.contact .eyebrow{background:rgba(255,255,255,.18);color:#fff}
+.contact .lead{color:#e3f6ff}
+.info{margin-top:30px;display:grid;gap:14px}
+.info a,.info div{display:flex;gap:16px;align-items:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);padding:16px 20px;border-radius:20px;backdrop-filter:blur(8px);transition:.25s}
+.info a:hover{background:rgba(255,255,255,.24);transform:translateX(6px)}
+.info .i{font-size:1.6rem}.info small{display:block;opacity:.8}
+form{background:var(--card);color:var(--ink);padding:34px;border-radius:30px;box-shadow:0 30px 60px -20px rgba(0,30,60,.6);display:grid;gap:16px}
+form h3{font-size:1.5rem}
+input,select,textarea{width:100%;padding:14px 16px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;transition:.2s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 4px rgba(10,143,214,.18)}
+form .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sub{font-size:.82rem;color:var(--ink2);text-align:center}
+
+footer{background:#021c2c;color:#b7d4e4;padding:60px 0 28px}
+footer .cols{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;margin-bottom:40px}
+footer .logo{color:#fff;display:inline-block;margin-bottom:12px}footer .logo b{color:var(--accent)}
+footer h4{color:#fff;margin-bottom:14px;font-family:Outfit}
+footer li{list-style:none;margin-bottom:8px}footer a:hover{color:#fff}
+.copy{border-top:1px solid #12425c;padding-top:22px;text-align:center;font-size:.9rem}
+.wa{position:fixed;right:20px;bottom:20px;z-index:60;width:60px;height:60px;border-radius:50%;background:#25d366;display:grid;place-items:center;font-size:1.8rem;box-shadow:0 10px 26px rgba(37,211,102,.55);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,211,102,.6)}100%{box-shadow:0 0 0 22px rgba(37,211,102,0)}}
+
+.reveal{opacity:0;transform:translateY(34px);transition:.8s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:900px){
+  .hero .grid,.about .grid,.contact .grid{grid-template-columns:1fr}
+  .bottle-stage{height:300px}.float.main{font-size:7rem}.blob{width:270px;height:270px}
+  .about-art{max-width:340px;margin:auto}
+  footer .cols{grid-template-columns:1fr}
+  .burger{display:block}
+  nav ul{position:fixed;inset:74px 0 auto 0;flex-direction:column;background:var(--bg);padding:26px;gap:20px;transform:translateY(-130%);transition:.4s;box-shadow:0 20px 30px rgba(0,0,0,.2)}
+  nav ul.open{transform:none}
+  nav a{color:var(--ink)!important}
+  section{padding:70px 0}
+  form .row{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<header id="top">
+  <div class="wrap nav">
+    <a href="#top" class="logo">Shree<b>.</b>eStore</a>
+    <nav>
+      <ul id="menu">
+        <li><a href="#top">Home</a></li>
+        <li><a href="#products">Products</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#reviews">Reviews</a></li>
+        <li><a href="#contact" class="btn">Contact Us</a></li>
+      </ul>
+    </nav>
+    <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<a class="wa" href="https://wa.me/918356005123" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">💬</a>
+
+<section class="hero">
+  <div class="bubbles" id="bubbles"></div>
+  <div class="wrap grid">
+    <div>
+      <span class="eyebrow" style="background:rgba(255,255,255,.18);color:#fff">✨ Shree.eStore</span>
+      <h1>Premium <span>Cleaning</span> Solutions</h1>
+      <p>Reliable products, consistent quality and great value for homes, offices, businesses and industries. A clean environment creates a healthier, more comfortable space.</p>
+      <div class="cta">
+        <a href="#contact" class="btn btn-primary">Contact Us →</a>
+        <a href="#products" class="btn btn-ghost">Explore Products</a>
+      </div>
+      <div class="chips"><span>🏠 Homes</span><span>🏢 Offices</span><span>🏪 Businesses</span><span>🏭 Industries</span></div>
+    </div>
+    <div class="bottle-stage" aria-hidden="true">
+      <div class="blob"></div>
+      <div class="float">🫧</div><div class="float">🧼</div>
+      <div class="float main">🧴</div>
+    </div>
+  </div>
+  <svg class="wave" viewBox="0 0 1440 80" preserveAspectRatio="none"><path fill="#12c6c0" fill-opacity=".0" d="M0 0h1440v80H0z"/><path fill="var(--ink)" d="M0 50C240 90 480 0 720 30s480 60 720 10v40H0z"/></svg>
+</section>
+
+<div class="marquee"><div>
+  <span>Dish Wash Liquid</span><span>Hand Wash</span><span>Laundry Detergent</span><span>Floor Cleaner</span><span>Toilet Cleaner</span><span>Bathroom Cleaner</span><span>Glass Cleaner</span><span>Car Shampoo</span><span>Disinfectant</span>
+  <span>Dish Wash Liquid</span><span>Hand Wash</span><span>Laundry Detergent</span><span>Floor Cleaner</span><span>Toilet Cleaner</span><span>Bathroom Cleaner</span><span>Glass Cleaner</span><span>Car Shampoo</span><span>Disinfectant</span>
+</div></div>
+
+<section id="products">
+  <div class="wrap center">
+    <span class="eyebrow reveal">Our Range</span>
+    <h2 class="reveal">Everything you need for a spotless space</h2>
+    <p class="lead reveal">From the kitchen to the car wash — cleaning products built to perform, priced to be fair.</p>
+    <div class="filters reveal" id="filters">
+      <button class="on" data-f="all">All</button><button data-f="home">Home</button><button data-f="bath">Bathroom</button><button data-f="surface">Floors &amp; Glass</button><button data-f="auto">Auto</button>
+    </div>
+    <div class="products" id="plist"></div>
+  </div>
+</section>
+
+<section class="why">
+  <div class="wrap center">
+    <span class="eyebrow reveal">Why Shree.eStore</span>
+    <h2 class="reveal">Clean made simple &amp; dependable</h2>
+    <div class="why-grid">
+      <div class="why-item reveal"><div class="n">✔</div><h3>Reliable Products</h3><p>Formulas you can count on, batch after batch.</p></div>
+      <div class="why-item reveal"><div class="n">⭐</div><h3>Consistent Quality</h3><p>The same powerful clean every single time you order.</p></div>
+      <div class="why-item reveal"><div class="n">💰</div><h3>Good Value</h3><p>Premium results without premium pricing — bulk deals available.</p></div>
+      <div class="why-item reveal"><div class="n">🚚</div><h3>Delivery Support</h3><p>Ask us about delivery, custom packages and product demonstrations.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="about" class="about">
+  <div class="wrap grid">
+    <div class="about-art reveal">🧽<small>Trusted for home &amp; commercial cleaning</small></div>
+    <div class="reveal">
+      <span class="eyebrow">About Us</span>
+      <h2>Welcome to Shree.eStore</h2>
+      <p class="lead">We are a trusted source for home and commercial cleaning products — helping families, facility teams and businesses keep every space fresh, hygienic and welcoming.</p>
+      <ul>
+        <li>Complete range: dish wash, hand wash, laundry, floor, toilet, bathroom &amp; glass care</li>
+        <li>Car shampoo and disinfectant for vehicles and workplaces</li>
+        <li>Bulk orders, product demonstrations and custom packages</li>
+      </ul>
+      <a href="#contact" class="btn btn-primary">Contact Us Now</a>
+    </div>
+  </div>
+  <div class="wrap center" style="margin-top:80px">
+    <h2 class="reveal" style="font-size:2rem">Made for every space</h2>
+    <div class="aud">
+      <div class="reveal"><em>🏠</em>Homes</div><div class="reveal"><em>🏢</em>Offices</div><div class="reveal"><em>🏪</em>Businesses</div><div class="reveal"><em>🏭</em>Industries</div>
+    </div>
+  </div>
+</section>
+
+<section id="reviews">
+  <div class="wrap center">
+    <span class="eyebrow reveal">Testimonials</span>
+    <h2 class="reveal">Trusted by professionals</h2>
+    <div class="tgrid" style="text-align:left">
+      <div class="t reveal"><div class="stars">★★★★★</div><h3>Outstanding Quality Products</h3><p>Their toilet cleaner, bathroom cleaner and glass cleaner keep our washrooms and windows spotless.</p><div class="who"><div class="av">TC</div><div><b>Facility Head</b><small>TechCorp Industries</small></div></div></div>
+      <div class="t reveal"><div class="stars">★★★★★</div><h3>Trusted by Professionals Everywhere</h3><p>Bathroom cleaner, toilet cleaner and glass cleaner deliver great results in commercial restrooms — streak-free every time.</p><div class="who"><div class="av">MF</div><div><b>Owner</b><small>Metro Facilities Management</small></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="contact" class="contact">
+  <div class="bubbles" id="bubbles2"></div>
+  <div class="wrap grid" style="position:relative;z-index:2">
+    <div class="reveal">
+      <span class="eyebrow">Get in Touch</span>
+      <h2>Let's get your space sparkling</h2>
+      <p class="lead">Send an enquiry for product information, pricing and delivery. We also handle bulk orders, demonstrations and custom packages.</p>
+      <div class="info">
+        <a href="tel:+918356005123"><span class="i">📞</span><span><small>Call us</small>+91 83560 05123</span></a>
+        <a href="mailto:info@shreeestore.online"><span class="i">✉️</span><span><small>Email</small>info@shreeestore.online</span></a>
+        <a href="https://wa.me/918356005123" target="_blank" rel="noopener"><span class="i">💬</span><span><small>WhatsApp</small>Chat with us</span></a>
+        <div><span class="i">📍</span><span><small>Main Office</small>Sai Datta Plaza, Shop No 07, Gaav Devi Rd, Kasheli Metro Station, Maharashtra 421302</span></div>
+        <div><span class="i">🕘</span><span><small>Business Hours</small>Monday to Saturday: 9:00 AM – 6:00 PM</span></div>
+      </div>
+    </div>
+    <form id="enq" class="reveal">
+      <h3>Send an Enquiry</h3>
+      <div class="row"><input name="name" placeholder="Your name" required><input name="phone" type="tel" placeholder="Phone number" required></div>
+      <select name="product"><option>General enquiry</option><option>Dish Wash Liquid</option><option>Hand Wash</option><option>Laundry Detergent</option><option>Floor Cleaner</option><option>Toilet Cleaner</option><option>Bathroom Cleaner</option><option>Glass Cleaner</option><option>Car Shampoo</option><option>Disinfectant</option><option>Bulk order</option></select>
+      <textarea name="msg" rows="4" placeholder="Tell us what you need (quantity, delivery location…)"></textarea>
+      <button class="btn btn-primary" type="submit">Send via WhatsApp →</button>
+      <p class="sub">Opens WhatsApp with your enquiry pre-filled.</p>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div><a class="logo" href="#top">Shree<b>.</b>eStore</a><p>Premium cleaning solutions for homes, offices, businesses and industries.</p></div>
+      <div><h4>Explore</h4><ul><li><a href="#top">Home</a></li><li><a href="#products">Products</a></li><li><a href="#about">About</a></li><li><a href="#reviews">Reviews</a></li><li><a href="#contact">Contact</a></li></ul></div>
+      <div><h4>Contact</h4><ul><li><a href="tel:+918356005123">+91 83560 05123</a></li><li><a href="mailto:info@shreeestore.online">info@shreeestore.online</a></li><li>Mon–Sat, 9 AM – 6 PM</li></ul></div>
+    </div>
+    <div class="copy">© 2026 Shree.eStore. All rights reserved.</div>
+  </div>
+</footer>
+
+<script>
+const P=[
+ ["Dish Wash Liquid","🍽️","home","Cuts grease fast, rinses clean and stays gentle on hands.","linear-gradient(90deg,#ffb703,#fb8500)","Bestseller"],
+ ["Hand Wash","🧼","home","Rich lather that cleans thoroughly while keeping skin soft.","linear-gradient(90deg,#ff7eb3,#ff758c)"],
+ ["Laundry Detergent","👕","home","Deep-cleans fabrics and keeps colours bright, wash after wash.","linear-gradient(90deg,#4facfe,#00f2fe)"],
+ ["Floor Cleaner","🧹","surface","Streak-free shine with a long-lasting fresh fragrance.","linear-gradient(90deg,#43e97b,#38f9d7)"],
+ ["Toilet Cleaner","🚽","bath","Powerful stain and limescale removal with lasting freshness.","linear-gradient(90deg,#667eea,#764ba2)","Pro pick"],
+ ["Bathroom Cleaner","🛁","bath","Dissolves soap scum and grime on tiles, taps and fittings.","linear-gradient(90deg,#12c6c0,#0a8fd6)"],
+ ["Glass Cleaner","🪟","surface","Crystal-clear, streak-free windows, mirrors and glass surfaces.","linear-gradient(90deg,#89f7fe,#66a6ff)"],
+ ["Car Shampoo","🚗","auto","Lifts dirt safely and leaves a glossy, showroom-style finish.","linear-gradient(90deg,#f6d365,#fda085)"],
+ ["Disinfectant","🛡️","bath","Hygiene protection for homes, offices and industrial spaces.","linear-gradient(90deg,#0a8fd6,#06283d)"]
+];
+const L=document.getElementById('plist');
+L.innerHTML=P.map(p=>`<article class="card reveal" data-c="${p[2]}" style="--c:${p[4]}">${p[5]?`<span class="tag">${p[5]}</span>`:''}<div class="ic">${p[1]}</div><h3>${p[0]}</h3><p>${p[3]}</p><a href="#contact" data-p="${p[0]}">Get a quote <span>→</span></a></article>`).join('');
+document.getElementById('filters').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#filters button').forEach(x=>x.classList.toggle('on',x===b));
+  L.querySelectorAll('.card').forEach(c=>c.classList.toggle('hide',b.dataset.f!=='all'&&c.dataset.c!==b.dataset.f));
+});
+L.addEventListener('click',e=>{const a=e.target.closest('a[data-p]');if(a)document.querySelector('[name=product]').value=a.dataset.p});
+// bubbles
+['bubbles','bubbles2'].forEach(id=>{const w=document.getElementById(id);for(let i=0;i<16;i++){const s=8+Math.random()*44,b=document.createElement('i');
+ b.style.cssText=`left:${Math.random()*100}%;width:${s}px;height:${s}px;animation-duration:${9+Math.random()*12}s;animation-delay:-${Math.random()*14}s`;w.appendChild(b)}});
+// header, menu
+const h=document.querySelector('header'),m=document.getElementById('menu');
+const sc=()=>h.classList.toggle('scrolled',scrollY>40);sc();addEventListener('scroll',sc,{passive:true});
+document.getElementById('burger').onclick=()=>m.classList.toggle('open');
+m.addEventListener('click',()=>m.classList.remove('open'));
+// reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i%4)*70+'ms';io.observe(el)});
+// form -> WhatsApp
+document.getElementById('enq').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);
+ const t=`Hello Shree.eStore,%0AName: ${encodeURIComponent(f.get('name'))}%0APhone: ${encodeURIComponent(f.get('phone'))}%0AInterested in: ${encodeURIComponent(f.get('product'))}%0A${encodeURIComponent(f.get('msg')||'')}`;
+ window.open('https://wa.me/918356005123?text='+t,'_blank')});
+</script>
+</body>
+</html>
