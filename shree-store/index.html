@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shree.eStore – Shop More, Save More, Live Better</title>
+<meta name="description" content="Shop premium cleaning products online: dish wash, floor, toilet, bathroom and glass cleaners, laundry detergent and disinfectant. Order via WhatsApp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#26356b; --navy2:#1a2550; --orange:#f08a2c; --orange2:#ff9f45;
+  --bg:#f6f8fc; --card:#fff; --ink:#1b2347; --mute:#667090; --line:#e4e9f3;
+  --green:#18a957; --shadow:0 16px 40px -16px rgba(38,53,107,.3);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0d1226;--card:#161d3a;--ink:#eef1ff;--mute:#a1abd0;--line:#26305a;--shadow:0 16px 40px -16px rgba(0,0,0,.7)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;overflow-x:hidden}
+h1,h2,h3,h4,.brand{font-family:Poppins,sans-serif;line-height:1.2}
+a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer}
+img{max-width:100%;display:block}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 26px;border-radius:12px;font-weight:600;border:0;font-size:.98rem;transition:.2s}
+.btn-o{background:var(--orange);color:#fff;box-shadow:0 10px 22px -8px rgba(240,138,44,.8)}
+.btn-o:hover{background:var(--orange2);transform:translateY(-2px)}
+.btn-n{background:var(--navy);color:#fff}.btn-n:hover{background:var(--navy2)}
+.btn-w{background:#fff;color:var(--navy)}.btn-w:hover{transform:translateY(-2px)}
+.btn-g{background:var(--green);color:#fff}
+.btn-line{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn-line:hover{border-color:var(--orange);color:var(--orange)}
+.btn[disabled]{opacity:.5;pointer-events:none}
+
+/* top bar + header */
+.topbar{background:var(--navy2);color:#dfe5ff;font-size:.82rem;text-align:center;padding:8px 12px}
+.topbar b{color:var(--orange2)}
+header{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.hd{display:flex;align-items:center;gap:20px;height:72px}
+.brand{font-size:1.6rem;font-weight:800;color:var(--navy);letter-spacing:-.03em;white-space:nowrap}
+.brand b{color:var(--orange)}
+@media (prefers-color-scheme:dark){.brand{color:#fff}}
+.search{flex:1;max-width:520px;position:relative}
+.search input{width:100%;padding:12px 16px 12px 44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;transition:.2s}
+.search input:focus{outline:0;border-color:var(--orange);box-shadow:0 0 0 4px rgba(240,138,44,.18)}
+.search::before{content:"🔍";position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:.95rem}
+.hnav{display:flex;gap:26px;margin-left:auto;font-weight:500}
+.hnav a:hover{color:var(--orange)}
+.cartbtn{position:relative;background:var(--navy);color:#fff;border:0;border-radius:12px;padding:11px 18px;font-weight:600;display:flex;gap:8px;align-items:center}
+.cartbtn:hover{background:var(--orange)}
+.cartbtn .n{background:var(--orange);color:#fff;min-width:22px;height:22px;border-radius:99px;font-size:.78rem;display:grid;place-items:center;padding:0 6px}
+.cartbtn:hover .n{background:var(--navy)}
+.bump{animation:bump .4s}@keyframes bump{40%{transform:scale(1.15)}}
+.burger{display:none;background:none;border:0;font-size:1.6rem;color:var(--ink)}
+
+/* hero */
+.hero{background:linear-gradient(120deg,var(--navy2) 0%,var(--navy) 55%,#3b4f9c 100%);color:#fff;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;width:560px;height:560px;right:-120px;top:-180px;border-radius:50%;background:radial-gradient(circle,rgba(240,138,44,.55),transparent 65%)}
+.hero .g{display:grid;grid-template-columns:1fr 1.1fr;gap:40px;align-items:center;padding:64px 20px;position:relative}
+.pill{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:6px 14px;border-radius:99px;font-size:.84rem;font-weight:500;margin-bottom:18px}
+.hero h1{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;letter-spacing:-.03em}
+.hero h1 span{color:var(--orange2)}
+.hero p{margin:18px 0 28px;opacity:.9;max-width:480px;font-size:1.08rem}
+.hero .cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero .stats{display:flex;gap:30px;margin-top:34px}
+.hero .stats b{display:block;font-family:Poppins;font-size:1.5rem}
+.hero .stats span{font-size:.85rem;opacity:.8}
+.hero-img{position:relative}
+.hero-img img{border-radius:28px;box-shadow:0 40px 70px -24px rgba(0,0,0,.6);border:6px solid rgba(255,255,255,.15);animation:fl 6s ease-in-out infinite}
+@keyframes fl{50%{transform:translateY(-12px)}}
+.badge{position:absolute;background:#fff;color:var(--ink);padding:10px 16px;border-radius:14px;font-weight:600;font-size:.88rem;box-shadow:var(--shadow)}
+.badge.a{left:-14px;bottom:30px}.badge.b{right:-8px;top:24px;background:var(--orange);color:#fff}
+
+/* trust */
+.trust{background:var(--card);border-bottom:1px solid var(--line)}
+.trust .g{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:22px 20px}
+.trust div{display:flex;gap:12px;align-items:center;font-size:.9rem}
+.trust i{font-style:normal;font-size:1.7rem}
+.trust b{display:block;font-family:Poppins;font-size:.95rem}.trust span{color:var(--mute);font-size:.82rem}
+
+/* shop */
+section{padding:70px 0}
+.sh{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+.sh h2{font-size:clamp(1.7rem,3.4vw,2.4rem);font-weight:700}
+.sh p{color:var(--mute)}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:28px}
+.cats{display:flex;gap:8px;flex-wrap:wrap;flex:1}
+.cats button{padding:9px 18px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font-weight:500;font-size:.92rem;transition:.2s}
+.cats button.on,.cats button:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+select{padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:22px}
+.p{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;display:flex;flex-direction:column;transition:.3s;position:relative}
+.p:hover{transform:translateY(-6px);box-shadow:var(--shadow);border-color:transparent}
+.p .im{aspect-ratio:1;background:linear-gradient(160deg,#eef2fb,#fff);overflow:hidden;cursor:pointer;position:relative}
+.p .im img{width:100%;height:100%;object-fit:cover;transition:.5s}
+.p:hover .im img{transform:scale(1.07)}
+.p .im.contain img{object-fit:contain;padding:14px}
+.tag{position:absolute;top:12px;left:12px;background:var(--orange);color:#fff;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:99px;z-index:2}
+.qv{position:absolute;left:50%;bottom:12px;transform:translate(-50%,20px);opacity:0;background:#fff;color:var(--navy);border:0;border-radius:99px;padding:8px 18px;font-weight:600;font-size:.84rem;box-shadow:var(--shadow);transition:.3s;z-index:2}
+.p:hover .qv{opacity:1;transform:translate(-50%,0)}
+.p .b{padding:16px 18px 20px;display:flex;flex-direction:column;gap:6px;flex:1}
+.p small{color:var(--orange);font-weight:600;font-size:.75rem;text-transform:uppercase;letter-spacing:.07em}
+.p h3{font-size:1.08rem;font-weight:600}
+.p .d{color:var(--mute);font-size:.86rem;flex:1}
+.stars{color:#f5b301;font-size:.85rem;letter-spacing:2px}.stars span{color:var(--mute);letter-spacing:0;margin-left:4px}
+.pr{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.pr b{font-family:Poppins;font-size:1.35rem;color:var(--navy)}
+@media (prefers-color-scheme:dark){.pr b{color:#fff}}
+.pr span{color:var(--mute);font-size:.82rem}
+.add{margin-top:10px;width:100%;padding:11px;border-radius:12px;border:0;background:var(--navy);color:#fff;font-weight:600;transition:.2s}
+.add:hover{background:var(--orange)}
+.empty{grid-column:1/-1;text-align:center;padding:60px;color:var(--mute)}
+
+/* banner */
+.banner{background:linear-gradient(110deg,var(--orange),#ff6f3c);color:#fff;border-radius:28px;padding:44px;display:grid;grid-template-columns:1.3fr 1fr;gap:30px;align-items:center;overflow:hidden;position:relative}
+.banner h2{font-size:clamp(1.6rem,3.2vw,2.4rem);margin-bottom:10px}
+.banner p{opacity:.95;margin-bottom:22px}
+.banner img{border-radius:20px;box-shadow:0 20px 40px -14px rgba(0,0,0,.4);transform:rotate(3deg)}
+
+/* why / reviews */
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.f{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px}
+.f i{font-style:normal;width:54px;height:54px;border-radius:16px;background:rgba(240,138,44,.14);display:grid;place-items:center;font-size:1.6rem;margin-bottom:14px}
+.f h3{margin-bottom:6px}.f p{color:var(--mute);font-size:.94rem}
+.rv{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+.r{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px}
+.r h3{margin:8px 0}.r p{color:var(--mute);margin-bottom:14px}.r b{font-size:.92rem}.r small{display:block;color:var(--mute)}
+
+/* contact */
+.ct{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:30px}
+.box h3{font-size:1.4rem;margin-bottom:16px}
+.row{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border:0}.row i{font-style:normal;font-size:1.3rem}.row small{display:block;color:var(--mute)}
+input,textarea{width:100%;padding:13px 15px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;margin-bottom:12px}
+input:focus,textarea:focus{outline:0;border-color:var(--orange)}
+
+footer{background:var(--navy2);color:#bcc6ef;padding:54px 0 24px}
+footer .c{display:grid;grid-template-columns:2fr 1fr 1fr;gap:34px;margin-bottom:30px}
+footer .brand{color:#fff;display:inline-block;margin-bottom:10px}
+footer h4{color:#fff;margin-bottom:12px}footer li{list-style:none;margin-bottom:7px}footer a:hover{color:var(--orange2)}
+.cp{border-top:1px solid #34437f;padding-top:18px;text-align:center;font-size:.88rem}
+
+/* drawer + modal */
+.ov{position:fixed;inset:0;background:rgba(10,15,40,.6);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.3s;z-index:80}
+.ov.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(440px,100%);background:var(--card);z-index:90;transform:translateX(105%);transition:.38s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(0,0,0,.3)}
+.drawer.open{transform:none}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line)}
+.dh h3{font-size:1.25rem}
+.x{background:var(--bg);border:0;width:36px;height:36px;border-radius:50%;font-size:1.1rem;color:var(--ink)}
+.db{flex:1;overflow:auto;padding:12px 22px}
+.ci{display:grid;grid-template-columns:72px 1fr auto;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);align-items:center}
+.ci img{width:72px;height:72px;border-radius:12px;object-fit:cover;background:#eef2fb}
+.ci h4{font-size:.95rem;font-weight:600}.ci small{color:var(--mute)}
+.qty{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;margin-top:6px}
+.qty button{width:30px;height:30px;background:none;border:0;font-size:1.05rem;color:var(--ink)}
+.qty span{min-width:26px;text-align:center;font-weight:600;font-size:.92rem}
+.rm{background:none;border:0;color:var(--mute);font-size:.8rem;text-decoration:underline}
+.df{padding:18px 22px;border-top:1px solid var(--line);display:grid;gap:10px}
+.tot{display:flex;justify-content:space-between;font-family:Poppins;font-weight:700;font-size:1.2rem}
+.ck{display:none;padding:0 22px 6px}
+.ck.show{display:block}
+.modal{position:fixed;inset:0;display:grid;place-items:center;padding:20px;z-index:95;pointer-events:none;opacity:0;transition:.3s}
+.modal.show{opacity:1;pointer-events:auto}
+.mb{background:var(--card);border-radius:26px;max-width:880px;width:100%;max-height:92vh;overflow:auto;display:grid;grid-template-columns:1fr 1fr;position:relative;transform:scale(.94);transition:.3s}
+.modal.show .mb{transform:none}
+.mb .mi{background:linear-gradient(160deg,#eef2fb,#fff);display:grid;place-items:center}
+.mb .mi img{width:100%;height:100%;object-fit:cover;max-height:520px}
+.mb .mi.contain img{object-fit:contain;padding:20px}
+.mb .mt{padding:34px 30px}
+.mb .x{position:absolute;right:14px;top:14px;z-index:3}
+.mt h2{font-size:1.7rem;margin:6px 0 10px}.mt p{color:var(--mute);margin-bottom:14px}
+.mt ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:8px 0 20px}
+.mt li{background:var(--bg);border:1px solid var(--line);padding:5px 12px;border-radius:99px;font-size:.82rem}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,120px);background:var(--navy);color:#fff;padding:13px 22px;border-radius:14px;z-index:120;font-weight:500;box-shadow:var(--shadow);transition:.4s}
+.toast.show{transform:translate(-50%,0)}
+.wa{position:fixed;right:18px;bottom:18px;z-index:60;width:56px;height:56px;border-radius:50%;background:#25d366;display:grid;place-items:center;font-size:1.7rem;box-shadow:0 10px 24px rgba(37,211,102,.5)}
+
+.rev{opacity:0;transform:translateY(26px);transition:.7s}.rev.in{opacity:1;transform:none}
+@media(max-width:900px){
+  .hero .g,.banner,.ct,.mb{grid-template-columns:1fr}
+  .trust .g{grid-template-columns:1fr 1fr}.feat,.rv{grid-template-columns:1fr}
+  footer .c{grid-template-columns:1fr}
+  .hnav{display:none;position:absolute;top:72px;left:0;right:0;background:var(--card);flex-direction:column;padding:20px;gap:16px;border-bottom:1px solid var(--line);margin:0}
+  .hnav.open{display:flex}.burger{display:block}
+  .search{max-width:none}.brand{font-size:1.3rem}
+  .hd{gap:10px}.cartbtn span.t{display:none}
+  .banner{padding:30px}.banner img{display:none}
+  .mb .mi img{max-height:300px}
+}
+@media(max-width:520px){.grid{grid-template-columns:repeat(2,1fr);gap:12px}.p .b{padding:12px}.p h3{font-size:.95rem}.p .d{display:none}.pr b{font-size:1.1rem}.hero .stats{gap:18px}.search{display:none}.hd{justify-content:space-between}.hd .brand{margin-right:auto}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rev{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="topbar">🚚 Bulk orders &amp; custom packages available · Call <b>+91 83560 05123</b> · Mon–Sat, 9 AM – 6 PM</div>
+
+<header>
+  <div class="wrap hd">
+    <button class="burger" id="burger" aria-label="Menu">☰</button>
+    <a href="#top" class="brand">shree<b>.</b>estore</a>
+    <div class="search"><input id="q" type="search" placeholder="Search cleaning products…" aria-label="Search products"></div>
+    <nav class="hnav" id="nav"><a href="#shop">Shop</a><a href="#why">Why Us</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a></nav>
+    <button class="cartbtn" id="cartBtn" aria-label="Open cart">🛒 <span class="t">Cart</span> <span class="n" id="cnt">0</span></button>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero" style="padding:0">
+  <div class="wrap g">
+    <div>
+      <span class="pill">✨ Shop More • Save More • Live Better</span>
+      <h1>Premium <span>cleaning</span> products, delivered.</h1>
+      <p>Reliable quality and great value for homes, offices, businesses and industries. Order online in a minute — we confirm on WhatsApp.</p>
+      <div class="cta"><a href="#shop" class="btn btn-o">Shop Now →</a><a href="#contact" class="btn btn-w">Bulk Enquiry</a></div>
+      <div class="stats"><div><b>7+</b><span>Cleaning products</span></div><div><b>500 ml</b><span>Easy-use bottles</span></div><div><b>₹100+</b><span>Starting price</span></div></div>
+    </div>
+    <div class="hero-img">
+      <img src="img/hero.webp" alt="Shree.estore cleaning products: detergent, floor cleaner, bathroom cleaner, toilet cleaner and dish wash liquid" width="1200" height="800">
+      <div class="badge a">✔ Pure Safety</div><div class="badge b">★ Best Value</div>
+    </div>
+  </div>
+</section>
+
+<div class="trust"><div class="wrap g">
+  <div><i>🛡️</i><p><b>Pure Safety</b><span>Safe, effective formulas</span></p></div>
+  <div><i>🏆</i><p><b>Proven Results</b><span>Trusted across India</span></p></div>
+  <div><i>💰</i><p><b>Best Value</b><span>Premium at fair prices</span></p></div>
+  <div><i>💬</i><p><b>Easy Ordering</b><span>Confirm via WhatsApp</span></p></div>
+</div></div>
+
+<section id="shop">
+  <div class="wrap">
+    <div class="sh rev"><div><h2>Shop our range</h2><p id="rc"></p></div></div>
+    <div class="tools rev">
+      <div class="cats" id="cats">
+        <button class="on" data-c="all">All</button><button data-c="Kitchen">Kitchen</button><button data-c="Bathroom">Bathroom</button><button data-c="Floor & Glass">Floor &amp; Glass</button><button data-c="Laundry">Laundry</button>
+      </div>
+      <select id="sort" aria-label="Sort"><option value="feat">Featured</option><option value="lo">Price: Low → High</option><option value="hi">Price: High → Low</option><option value="az">Name: A → Z</option></select>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="banner rev">
+      <div><h2>Buying for an office, shop or factory?</h2><p>Get special pricing on bulk orders, product demonstrations and custom packages. Tell us what you need and we'll quote on WhatsApp.</p><a class="btn btn-w" href="https://wa.me/918356005123?text=Hello%20Shree.eStore%2C%20I%20want%20a%20bulk%20order%20quote." target="_blank" rel="noopener">Get Bulk Quote →</a></div>
+      <img src="img/disinfectant.webp" alt="Disinfectant cleaning" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section id="why" style="padding-top:20px">
+  <div class="wrap">
+    <div class="sh rev"><div><h2>Why customers choose us</h2><p>Clean made simple, dependable and affordable.</p></div></div>
+    <div class="feat">
+      <div class="f rev"><i>🛡️</i><h3>Pure Safety</h3><p>Every formula meets rigorous safety standards — gentle yet powerful cleaning for homes and businesses alike.</p></div>
+      <div class="f rev"><i>✅</i><h3>Proven Results</h3><p>Trusted by households and commercial clients across India for consistently superior performance and lasting cleanliness.</p></div>
+      <div class="f rev"><i>💎</i><h3>Best Value</h3><p>Premium quality at competitive prices, delivering exceptional cleaning power without compromising your budget.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="reviews" style="padding-top:20px">
+  <div class="wrap">
+    <div class="sh rev"><div><h2>Trusted by professionals</h2></div></div>
+    <div class="rv">
+      <div class="r rev"><div class="stars">★★★★★</div><h3>Outstanding Quality Products</h3><p>Their toilet cleaner, bathroom cleaner and glass cleaner keep our washrooms and windows spotless.</p><b>Facility Head</b><small>TechCorp Industries</small></div>
+      <div class="r rev"><div class="stars">★★★★★</div><h3>Trusted by Professionals Everywhere</h3><p>Great results in commercial restrooms — streak-free glass and fresh, clean washrooms every time.</p><b>Owner</b><small>Metro Facilities Management</small></div>
+    </div>
+  </div>
+</section>
+
+<section id="contact" style="padding-top:20px">
+  <div class="wrap ct">
+    <div class="box rev"><h3>Get in touch</h3>
+      <div class="row"><i>📞</i><div><small>Phone</small><a href="tel:+918356005123">+91 83560 05123</a></div></div>
+      <div class="row"><i>✉️</i><div><small>Email</small><a href="mailto:info@shreeestore.online">info@shreeestore.online</a></div></div>
+      <div class="row"><i>📍</i><div><small>Main Office</small>Sai Datta Plaza, Shop No 07, Gaav Devi Rd, Kasheli Metro Station, Maharashtra 421302</div></div>
+      <div class="row"><i>🕘</i><div><small>Business hours</small>Monday to Saturday: 9:00 AM – 6:00 PM</div></div>
+    </div>
+    <form class="box rev" id="enq"><h3>Send an enquiry</h3>
+      <input name="n" placeholder="Your name" required><input name="p" type="tel" placeholder="Phone number" required>
+      <textarea name="m" rows="4" placeholder="Product info, pricing, delivery…"></textarea>
+      <button class="btn btn-o" style="width:100%" type="submit">Send via WhatsApp →</button>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">
+  <div class="c">
+    <div><a class="brand" href="#top">shree<b style="color:var(--orange)">.</b>estore</a><p>Shop more. Save more. Live better.<br>Premium cleaning solutions for homes, offices, businesses and industries.</p></div>
+    <div><h4>Shop</h4><ul><li><a href="#shop">All products</a></li><li><a href="#why">Why us</a></li><li><a href="#reviews">Reviews</a></li></ul></div>
+    <div><h4>Contact</h4><ul><li><a href="tel:+918356005123">+91 83560 05123</a></li><li><a href="mailto:info@shreeestore.online">info@shreeestore.online</a></li><li>Mon–Sat, 9 AM – 6 PM</li></ul></div>
+  </div>
+  <div class="cp">© 2026 Shree.eStore. All rights reserved.</div>
+</div></footer>
+
+<a class="wa" href="https://wa.me/918356005123" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
+
+<div class="ov" id="ov"></div>
+<aside class="drawer" id="drawer" aria-label="Shopping cart">
+  <div class="dh"><h3>Your cart</h3><button class="x" id="closeCart" aria-label="Close">✕</button></div>
+  <div class="db" id="items"></div>
+  <form class="ck" id="ck">
+    <input name="name" placeholder="Full name" required><input name="phone" type="tel" placeholder="Phone number" required>
+    <textarea name="addr" rows="2" placeholder="Delivery address" required></textarea>
+  </form>
+  <div class="df" id="foot">
+    <div class="tot"><span>Total</span><span id="tot">₹0</span></div>
+    <button class="btn btn-o" id="go">Proceed to checkout →</button>
+    <button class="btn btn-line" id="back" style="display:none">← Back to cart</button>
+  </div>
+</aside>
+<div class="modal" id="modal"><div class="mb" id="mb"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PH='918356005123';
+/* Prices and descriptions taken from shreeestore.online; null price = ask on WhatsApp */
+const PRODUCTS=[
+ {id:1,name:"Dish Wash Liquid",cat:"Kitchen",price:120,size:"500 ml",img:"img/dishwash.webp",tag:"Bestseller",desc:"Powerful grease-cutting formula removes stubborn oil, food residue and everyday stains. Rich foam, refreshing fragrance, suitable for daily use.",use:["Stainless Steel Utensils","Glassware","Ceramic & Porcelain","Non-Stick Cookware","Kitchen Accessories"]},
+ {id:2,name:"Floor Cleaner",cat:"Floor & Glass",price:null,size:"500 ml",img:"img/floor.webp",desc:"Removes dirt, dust and routine stains while leaving a pleasant fragrance. Suitable for residential and commercial flooring.",use:["Tiles","Marble","Granite","Vitrified Floors","Office & Commercial Flooring"]},
+ {id:3,name:"Laundry Detergent",cat:"Laundry",price:180,size:"500 ml",img:"img/detergent.webp",desc:"Tackles everyday dirt and common stains while keeping fabrics fresh. For both hand washing and machine washing.",use:["Everyday Clothing","Bedsheets & Curtains","Towels","Uniforms","Delicate & Regular Fabrics"]},
+ {id:4,name:"Toilet Cleaner",cat:"Bathroom",price:135,size:"500 ml",img:"img/toilet.webp",tag:"Top rated",desc:"Removes stubborn stains, mineral deposits and odours. Easy-use bottle for convenient application under the rim.",use:["Western Toilets","Indian Toilets","Ceramic Toilet Bowls"]},
+ {id:5,name:"Bathroom Cleaner",cat:"Bathroom",price:null,size:"500 ml",img:"img/bathroom.webp",desc:"Removes soap scum, water spots and everyday grime, restoring cleanliness and shine in homes and commercial spaces.",use:["Bathroom Tiles","Wash Basins","Faucets & Fixtures","Shower Areas"]},
+ {id:6,name:"Glass Cleaner",cat:"Floor & Glass",price:100,size:"500 ml",img:"img/glass.webp",contain:true,desc:"Removes fingerprints, dust, smudges and light marks for a clean, streak-free finish on windows, mirrors and glass furniture.",use:["Glass Windows","Mirrors","Glass Tables","Glass Doors","Display Cabinets"]},
+ {id:7,name:"Disinfectant Liquid",cat:"Bathroom",price:160,size:"500 ml",img:"img/disinfectant.webp",desc:"Kills germs on contact for everyday hygiene in homes, offices and industrial spaces.",use:["Floors","Bathrooms","Kitchens","Offices & Workplaces"]}
+];
+const $=s=>document.querySelector(s), money=n=>'₹'+n.toLocaleString('en-IN');
+let cart=JSON.parse((()=>{try{return localStorage.getItem('se_cart')}catch(e){return null}})()||'{}');
+const save=()=>{try{localStorage.setItem('se_cart',JSON.stringify(cart))}catch(e){}};
+let cat='all',term='',sort='feat';
+
+function stars(){return `<div class="stars">★★★★★<span>Customer favourite</span></div>`}
+function render(){
+  let l=PRODUCTS.filter(p=>(cat==='all'||p.cat===cat)&&p.name.toLowerCase().includes(term));
+  if(sort==='lo')l.sort((a,b)=>(a.price??1e9)-(b.price??1e9));
+  if(sort==='hi')l.sort((a,b)=>(b.price??-1)-(a.price??-1));
+  if(sort==='az')l.sort((a,b)=>a.name.localeCompare(b.name));
+  $('#rc').textContent=l.length+' product'+(l.length===1?'':'s');
+  $('#grid').innerHTML=l.length?l.map(p=>`<article class="p"><div class="im ${p.contain?'contain':''}" data-q="${p.id}">${p.tag?`<span class="tag">${p.tag}</span>`:''}<img src="${p.img}" alt="${p.name} ${p.size}" loading="lazy"><button class="qv" data-q="${p.id}">Quick view</button></div><div class="b"><small>${p.cat}</small><h3>${p.name}</h3><p class="d">${p.desc.split('. ')[0]}.</p><div class="pr"><b>${p.price?money(p.price):'Ask price'}</b><span>${p.price?'/ '+p.size:p.size}</span></div><button class="add" data-a="${p.id}">${p.price?'Add to cart':'Add to enquiry'}</button></div></article>`).join(''):`<div class="empty"><h3>No products found</h3><p>Try a different search or category.</p></div>`;
+}
+$('#cats').onclick=e=>{const b=e.target.closest('button');if(!b)return;cat=b.dataset.c;document.querySelectorAll('#cats button').forEach(x=>x.classList.toggle('on',x===b));render()};
+$('#q').oninput=e=>{term=e.target.value.trim().toLowerCase();render();if(term)$('#shop').scrollIntoView({behavior:'smooth'})};
+$('#sort').onchange=e=>{sort=e.target.value;render()};
+
+function add(id,n=1){cart[id]=(cart[id]||0)+n;save();draw();const c=$('#cnt');c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump');toast('Added '+PRODUCTS.find(p=>p.id==id).name+' to cart')}
+function draw(){
+  const ids=Object.keys(cart);let t=0,n=0,ask=false;
+  $('#items').innerHTML=ids.length?ids.map(id=>{const p=PRODUCTS.find(x=>x.id==id),q=cart[id];n+=q;if(p.price)t+=p.price*q;else ask=true;
+   return `<div class="ci"><img src="${p.img}" alt=""><div><h4>${p.name}</h4><small>${p.price?money(p.price)+' · '+p.size:'Price on request'}</small><br><div class="qty"><button data-m="${id}" aria-label="Less">−</button><span>${q}</span><button data-p="${id}" aria-label="More">+</button></div> <button class="rm" data-r="${id}">Remove</button></div><b>${p.price?money(p.price*q):'—'}</b></div>`}).join('')
+   :`<div class="empty"><div style="font-size:3rem">🛒</div><h3>Your cart is empty</h3><p>Add some products to get started.</p></div>`;
+  $('#cnt').textContent=n;$('#tot').textContent=money(t)+(ask?' +':'');
+  $('#go').disabled=!ids.length;
+}
+$('#items').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(d.p)cart[d.p]++;if(d.m&&--cart[d.m]<1)delete cart[d.m];if(d.r)delete cart[d.r];save();draw()};
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-a]');if(a){add(+a.dataset.a);return}
+  const q=e.target.closest('[data-q]');if(q)openModal(+q.dataset.q);
+});
+function openModal(id){const p=PRODUCTS.find(x=>x.id===id);
+  $('#mb').innerHTML=`<button class="x" id="mx" aria-label="Close">✕</button><div class="mi ${p.contain?'contain':''}"><img src="${p.img}" alt="${p.name}"></div><div class="mt"><small style="color:var(--orange);font-weight:600">${p.cat.toUpperCase()}</small><h2>${p.name} ${p.size}</h2>${stars()}<div class="pr" style="margin:12px 0"><b style="font-size:1.8rem">${p.price?money(p.price):'Ask for price'}</b><span>${p.price?'per '+p.size:''}</span></div><p>${p.desc}</p><b style="font-size:.9rem">Suitable for</b><ul>${p.use.map(u=>`<li>${u}</li>`).join('')}</ul><button class="btn btn-o" style="width:100%" data-a="${p.id}">${p.price?'Add to cart':'Add to enquiry'}</button></div>`;
+  $('#modal').classList.add('show');$('#ov').classList.add('show');$('#mx').onclick=closeAll}
+function openCart(){$('#drawer').classList.add('open');$('#ov').classList.add('show');step(0)}
+function closeAll(){$('#drawer').classList.remove('open');$('#modal').classList.remove('show');$('#ov').classList.remove('show')}
+$('#cartBtn').onclick=openCart;$('#closeCart').onclick=closeAll;$('#ov').onclick=closeAll;
+$('#modal').onclick=e=>{if(e.target.id==='modal')closeAll()};
+addEventListener('keydown',e=>{if(e.key==='Escape')closeAll()});
+let st=0;function step(s){st=s;$('#ck').classList.toggle('show',s===1);$('#items').style.display=s?'none':'';$('#back').style.display=s?'':'none';$('#go').textContent=s?'Place order on WhatsApp ✓':'Proceed to checkout →'}
+$('#back').onclick=()=>step(0);
+$('#go').onclick=()=>{
+  if(!st){step(1);return}
+  const f=$('#ck');if(!f.reportValidity())return;const d=new FormData(f);
+  let t=0,lines=Object.keys(cart).map(id=>{const p=PRODUCTS.find(x=>x.id==id),q=cart[id];if(p.price)t+=p.price*q;return `• ${p.name} ${p.size} × ${q}${p.price?' = '+money(p.price*q):' (price on request)'}`});
+  const msg=`*New order – Shree.eStore*\n\n${lines.join('\n')}\n\n*Total:* ${money(t)}\n\n*Name:* ${d.get('name')}\n*Phone:* ${d.get('phone')}\n*Address:* ${d.get('addr')}`;
+  window.open(`https://wa.me/${PH}?text=${encodeURIComponent(msg)}`,'_blank');
+  cart={};save();draw();step(0);closeAll();toast('Order sent to WhatsApp. We will confirm shortly!');
+};
+$('#enq').onsubmit=e=>{e.preventDefault();const d=new FormData(e.target);window.open(`https://wa.me/${PH}?text=${encodeURIComponent(`Hello Shree.eStore,\nName: ${d.get('n')}\nPhone: ${d.get('p')}\n${d.get('m')||''}`)}`,'_blank')};
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
+$('#burger').onclick=()=>$('#nav').classList.toggle('open');$('#nav').onclick=()=>$('#nav').classList.remove('open');
+const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}}),{threshold:.1});
+document.querySelectorAll('.rev').forEach(el=>io.observe(el));
+render();draw();
+</script>
+</body>
+</html>
