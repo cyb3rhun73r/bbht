@@ -1,0 +1,11 @@
+# Sensitive hunt output - never commit
+findings/
+recon/
+reports/
+hunt-memory/
+config.json
+.env
+*.burp
+secrets.txt
+api_keys.txt
+.private/
